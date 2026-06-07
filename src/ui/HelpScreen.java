@@ -2,23 +2,19 @@ package ui;
 import javax.swing.*;
 import java.awt.*;
 
-/**
- * HelpScreen
- * ----------
- * Modal dialog that explains controls, power-ups, and game rules.
- * Organized into tabbed sections for quick navigation.
+/*
+  HelpScreen
+  Modal dialog that explains controls, power-ups, and game rules
  */
 public class HelpScreen extends JDialog {
 
-    // ── Colours ───────────────────────────────────────────────────────────────
+    // Colours
     private static final Color BG        = new Color(12, 12, 12);
     private static final Color HEADER_BG = new Color(0, 60, 0);
     private static final Color FG        = new Color(200, 255, 180);
     private static final Color ACCENT    = new Color(80, 255, 80);
     private static final Color KEY_BG    = new Color(40, 40, 40);
     private static final Color KEY_FG    = Color.YELLOW;
-
-    // ─────────────────────────────────────────────────────────────────────────
 
     public HelpScreen(Frame owner) {
         super(owner, "?  How to Play", true);
@@ -35,7 +31,7 @@ public class HelpScreen extends JDialog {
         setResizable(false);
     }
 
-    // ── Header ────────────────────────────────────────────────────────────────
+    // Header
 
     private JPanel buildHeader() {
         JPanel p = new JPanel();
@@ -48,7 +44,7 @@ public class HelpScreen extends JDialog {
         return p;
     }
 
-    // ── Tabbed pane ───────────────────────────────────────────────────────────
+    // Tabbed pane
 
     private JTabbedPane buildTabs() {
         JTabbedPane tabs = new JTabbedPane();
@@ -62,7 +58,7 @@ public class HelpScreen extends JDialog {
         return tabs;
     }
 
-    // ── Controls tab ──────────────────────────────────────────────────────────
+    // Controls tab
 
     private JPanel buildControlsPanel() {
         JPanel p = darkPanel();
@@ -93,7 +89,7 @@ public class HelpScreen extends JDialog {
         return p;
     }
 
-    // ── Power-ups tab ─────────────────────────────────────────────────────────
+    // Power-ups tab
 
     private JPanel buildPowerUpsPanel() {
         JPanel p = darkPanel();
@@ -133,7 +129,7 @@ public class HelpScreen extends JDialog {
         return p;
     }
 
-    // ── Rules tab ─────────────────────────────────────────────────────────────
+    // Rules tab
 
     private JPanel buildRulesPanel() {
         JPanel p = darkPanel();
@@ -176,7 +172,7 @@ public class HelpScreen extends JDialog {
         return p;
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    // Helpers
 
     private JPanel darkPanel() {
         JPanel p = new JPanel();
@@ -202,7 +198,7 @@ public class HelpScreen extends JDialog {
         p.add(lbl, gc);
     }
 
-    // ── Close button ──────────────────────────────────────────────────────────
+    // Close button
 
     private JPanel buildClose() {
         JPanel p = new JPanel();

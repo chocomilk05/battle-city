@@ -4,22 +4,13 @@ import javax.swing.border.*;
 import java.awt.*;
 import java.util.prefs.Preferences;
 
-/**
- * OptionsScreen
- * -------------
- * Modal dialog for game settings:
- *  - Difficulty (Easy / Normal / Hard)
- *  - Sound effects toggle
- *  - Music volume slider
- *  - Player name (prefilled in end-of-game dialog)
- *  - Controls reminder
- *
- * Settings are persisted via java.util.prefs.Preferences
- * (stored in the OS user registry / home directory – no external file needed).
+/*
+  OptionsScreen
+  Modal dialog for game settings:
  */
 public class OptionsScreen extends JDialog {
 
-    // ── Preference keys ───────────────────────────────────────────────────────
+    // Preference keys
     public static final String PREF_DIFFICULTY   = "difficulty";
     public static final String PREF_SOUND        = "sound";
     public static final String PREF_MUSIC_VOL    = "musicVolume";
@@ -29,24 +20,22 @@ public class OptionsScreen extends JDialog {
     public static final String DIFF_NORMAL = "Normal";
     public static final String DIFF_HARD   = "Hard";
 
-    // ── Persistence ───────────────────────────────────────────────────────────
+    // Persistence
     private static final Preferences PREFS =
         Preferences.userNodeForPackage(OptionsScreen.class);
 
-    // ── Colours ───────────────────────────────────────────────────────────────
+    // Colours
     private static final Color BG       = new Color(12, 12, 12);
     private static final Color SECT_BG  = new Color(25, 10, 0);
     private static final Color ACCENT   = new Color(255, 140, 0);
     private static final Color FG       = new Color(220, 200, 160);
     private static final Color BORDER   = new Color(100, 40, 0);
 
-    // ── Controls ──────────────────────────────────────────────────────────────
+    // Controls
     private JComboBox<String> diffCombo;
     private JCheckBox         soundCheck;
     private JSlider           musicSlider;
     private JTextField        nameField;
-
-    // ─────────────────────────────────────────────────────────────────────────
 
     public OptionsScreen(Frame owner) {
         super(owner, "⚙  Options", true);
@@ -63,7 +52,7 @@ public class OptionsScreen extends JDialog {
         setResizable(false);
     }
 
-    // ── Header ────────────────────────────────────────────────────────────────
+    // Header
 
     private JPanel buildHeader() {
         JPanel p = new JPanel();
@@ -76,7 +65,7 @@ public class OptionsScreen extends JDialog {
         return p;
     }
 
-    // ── Form ──────────────────────────────────────────────────────────────────
+    // Form
 
     private JPanel buildForm() {
         JPanel form = new JPanel();
@@ -84,7 +73,7 @@ public class OptionsScreen extends JDialog {
         form.setLayout(new BoxLayout(form, BoxLayout.Y_AXIS));
         form.setBorder(BorderFactory.createEmptyBorder(16, 24, 8, 24));
 
-        // ── Player name ───────────────────────────────────────────────────────
+        // Player name
         form.add(sectionLabel("Player Name"));
         nameField = new JTextField(PREFS.get(PREF_PLAYER_NAME, "Player1"), 20);
         styleTextField(nameField);
@@ -92,7 +81,7 @@ public class OptionsScreen extends JDialog {
         form.add(nameField);
         form.add(Box.createVerticalStrut(14));
 
-        // ── Difficulty ────────────────────────────────────────────────────────
+        // Difficulty
         form.add(sectionLabel("Difficulty"));
         diffCombo = new JComboBox<>(new String[]{DIFF_EASY, DIFF_NORMAL, DIFF_HARD});
         diffCombo.setSelectedItem(PREFS.get(PREF_DIFFICULTY, DIFF_NORMAL));
@@ -107,7 +96,7 @@ public class OptionsScreen extends JDialog {
         form.add(diffHint);
         form.add(Box.createVerticalStrut(14));
 
-        // ── Sound effects ─────────────────────────────────────────────────────
+        // Sound effects
         form.add(sectionLabel("Audio"));
         soundCheck = new JCheckBox("Enable sound effects",
                                    PREFS.getBoolean(PREF_SOUND, true));
@@ -135,7 +124,7 @@ public class OptionsScreen extends JDialog {
         form.add(musicSlider);
         form.add(Box.createVerticalStrut(14));
 
-        // ── Controls reminder ─────────────────────────────────────────────────
+        // Controls reminder
         form.add(sectionLabel("Controls"));
         form.add(hintArea(
             "Move: W A S D  or  Arrow keys\n" +
@@ -145,7 +134,7 @@ public class OptionsScreen extends JDialog {
         return form;
     }
 
-    // ── Buttons ───────────────────────────────────────────────────────────────
+    // Buttons
 
     private JPanel buildButtons() {
         JPanel p = new JPanel(new FlowLayout(FlowLayout.CENTER, 14, 10));
@@ -180,29 +169,25 @@ public class OptionsScreen extends JDialog {
         return p;
     }
 
-    // ── Static helpers for reading saved preferences ──────────────────────────
+    // Static helpers
 
-    /** @return currently saved difficulty string. */
     public static String getSavedDifficulty() {
         return PREFS.get(PREF_DIFFICULTY, DIFF_NORMAL);
     }
 
-    /** @return whether sound effects are enabled. */
     public static boolean isSoundEnabled() {
         return PREFS.getBoolean(PREF_SOUND, true);
     }
 
-    /** @return saved music volume 0-100. */
     public static int getMusicVolume() {
         return PREFS.getInt(PREF_MUSIC_VOL, 70);
     }
 
-    /** @return saved player name. */
     public static String getPlayerName() {
         return PREFS.get(PREF_PLAYER_NAME, "Player1");
     }
 
-    // ── Styling helpers ───────────────────────────────────────────────────────
+    // Styling helpers
 
     private JLabel sectionLabel(String text) {
         JLabel lbl = new JLabel(text);

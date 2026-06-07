@@ -5,23 +5,16 @@ import data.ScoreEntry;
 import javax.swing.*;
 import java.awt.*;
 
-/**
- * HUD
- * ---
- * Paints the right-side heads-up display during gameplay.
- * Call hud.draw(g2, engine, isPaused()) inside GamePanel.paintComponent,
- * AFTER drawing the map and entities.
- */
 public class HUD {
 
-    // ── Layout ────────────────────────────────────────────────────────────────
+    // Layout
     private static final int X   = GamePanel.MAP_WIDTH;
     private static final int W   = GamePanel.HUD_WIDTH;
     private static final int PAD = 8;
     private static final int IX  = X + PAD;
     private static final int IW  = W - PAD * 2;
 
-    // ── Colours ───────────────────────────────────────────────────────────────
+    // Colours
     private static final Color BG            = new Color(28, 14, 0);
     private static final Color BORDER_COL    = new Color(100, 40, 0);
     private static final Color LABEL_COL     = new Color(160, 120, 60);
@@ -34,7 +27,7 @@ public class HUD {
     private static final Color PAUSE_BG      = new Color(0, 0, 0, 180);
     private static final Color POWERUP_ACTIVE = new Color(100, 255, 100);
 
-    // ── Fonts ─────────────────────────────────────────────────────────────────
+    // Fonts
     private static final Font F_LABEL = new Font("Monospaced", Font.BOLD,  11);
     private static final Font F_VALUE = new Font("Monospaced", Font.BOLD,  16);
     private static final Font F_SMALL = new Font("Monospaced", Font.PLAIN, 11);
@@ -42,17 +35,13 @@ public class HUD {
     private static final Font F_PAUSE = new Font("Monospaced", Font.BOLD,  15);
     private static final Font F_STAR  = new Font("Dialog",     Font.PLAIN, 18);
 
-    // ── Cached high score (read once per session, updated if beaten) ──────────
     private int cachedHighScore = -1;
 
-    // ─────────────────────────────────────────────────────────────────────────
     //  Main draw entry point
-    // ─────────────────────────────────────────────────────────────────────────
 
     public void draw(Graphics2D g, GameEngine engine, boolean paused) {
         enableAA(g);
 
-        // Background strip + left border
         g.setColor(BG);
         g.fillRect(X, 0, W, GamePanel.MAP_HEIGHT);
         g.setColor(BORDER_COL);
@@ -60,14 +49,14 @@ public class HUD {
 
         int y = 18;
 
-        // ── SCORE ─────────────────────────────────────────────────────────────
+        // SCORE
         y = drawSection(g, y, "SCORE");
         g.setFont(F_SCORE);
         g.setColor(SCORE_COL);
         g.drawString(formatScore(engine.getScore()), IX, y);
         y += 6;
 
-        // ── HI-SCORE ──────────────────────────────────────────────────────────
+        // HI-SCORE
         y = separator(g, y);
         g.setFont(F_LABEL);
         g.setColor(LABEL_COL);
@@ -78,7 +67,7 @@ public class HUD {
         g.drawString(formatScore(getHighScore(engine.getScore())), IX, y);
         y += 6;
 
-        // ── LEVEL ─────────────────────────────────────────────────────────────
+        // LEVEL
         y = separator(g, y);
         y = drawSection(g, y, "LEVEL");
         g.setFont(F_VALUE);
@@ -86,35 +75,34 @@ public class HUD {
         g.drawString(String.valueOf(engine.getLevelNumber()), IX, y);
         y += 6;
 
-        // ── ENEMY ─────────────────────────────────────────────────────────────
+        // ENEMY
         y = separator(g, y);
         y = drawSection(g, y, "ENEMY");
-        // FIX: clamp to 0 so it never shows negative when all enemies are gone
         int remaining = Math.max(0, engine.getRemainingEnemies());
         y = drawTankIcons(g, y, remaining, ENEMY_COL, 20);
         y += 4;
 
-        // ── LIVES ─────────────────────────────────────────────────────────────
+        // LIVES
         y = separator(g, y);
         y = drawSection(g, y, "LIVES");
         y = drawTankIcons(g, y, engine.getLives(), LIFE_COL, 3);
         y += 4;
 
-        // ── STARS ─────────────────────────────────────────────────────────────
+        // STARS
         y = separator(g, y);
         y = drawSection(g, y, "STARS");
         y = drawStars(g, y, engine.getPlayerStars());
         y += 4;
 
-        // ── ACTIVE POWER-UP ───────────────────────────────────────────────────
+        // ACTIVE POWER-UP
         y = separator(g, y);
         drawActivePowerUp(g, y, engine);
 
-        // ── PAUSED overlay ────────────────────────────────────────────────────
+        // PAUSED overlay
         if (paused) drawPauseBanner(g);
     }
 
-    // ── Section helpers ───────────────────────────────────────────────────────
+    // Section helpers
 
     private int drawSection(Graphics2D g, int y, String label) {
         g.setFont(F_LABEL);
@@ -130,7 +118,7 @@ public class HUD {
         return y + 8;
     }
 
-    // ── Tank icon grid ────────────────────────────────────────────────────────
+    // Tank icon grid
 
     private int drawTankIcons(Graphics2D g, int y, int count, Color colour, int cap) {
         int shown = Math.min(count, cap);
@@ -163,7 +151,7 @@ public class HUD {
         g.drawRect(x, y + 3, 14, 8);
     }
 
-    // ── Stars ─────────────────────────────────────────────────────────────────
+    // Stars
 
     private int drawStars(Graphics2D g, int y, int starCount) {
         g.setFont(F_STAR);
@@ -174,7 +162,7 @@ public class HUD {
         return y + 6;
     }
 
-    // ── Active power-up indicator ─────────────────────────────────────────────
+    // Active power-up indicator
 
     private void drawActivePowerUp(Graphics2D g, int y, GameEngine engine) {
         g.setFont(F_LABEL);
@@ -206,7 +194,7 @@ public class HUD {
         }
     }
 
-    // ── Pause banner ──────────────────────────────────────────────────────────
+    // Pause banner
 
     private void drawPauseBanner(Graphics2D g) {
         g.setColor(PAUSE_BG);
@@ -226,7 +214,7 @@ public class HUD {
         }
     }
 
-    // ── Utilities ─────────────────────────────────────────────────────────────
+    // Utilities
 
     private String formatScore(int score) {
         return String.format("%06d", Math.max(0, score));
@@ -240,7 +228,6 @@ public class HUD {
                 .max()
                 .orElse(0);
         }
-        // Update cache in real-time if current score beats it
         if (currentScore > cachedHighScore) cachedHighScore = currentScore;
         return cachedHighScore;
     }

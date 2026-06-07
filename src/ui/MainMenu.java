@@ -1,32 +1,26 @@
 package ui;
 import javax.swing.*;
+
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.Rectangle2D;
 
-/**
- * MainMenu
- * --------
- * Splash / title screen shown at launch and after each game ends.
- *
- * Features:
- *  - Animated "BATTLE CITY" title that flickers like the original arcade.
- *  - Blinking "PRESS ENTER TO START" prompt.
- *  - Row of navigation buttons: New Game | High Scores | Options | Help | Exit.
- *  - Keyboard shortcut: Enter → New Game.
+/*
+  MainMenu
+  Splash / title screen shown at launch and after each game ends
  */
 public class MainMenu extends JPanel implements ActionListener {
 
-    // ── Parent reference ──────────────────────────────────────────────────────
+    // Parent reference
     private final GameFrame owner;
 
-    // ── Animation ─────────────────────────────────────────────────────────────
+    // Animation
     private final Timer animTimer;
     private boolean     blinkOn     = true;
     private int         flickerStep = 0;
     private float       titleHue    = 0f;   // colour cycle for title
 
-    // ── Colours ───────────────────────────────────────────────────────────────
+    // Colours
     private static final Color BG        = Color.BLACK;
     private static final Color TITLE_A   = new Color(220, 40,  40);
     private static final Color TITLE_B   = new Color(255, 180, 0);
@@ -36,9 +30,7 @@ public class MainMenu extends JPanel implements ActionListener {
     private static final Color BTN_BG    = new Color(40, 0, 0);
     private static final Color BTN_HOVER = new Color(80, 20, 0);
 
-    // ─────────────────────────────────────────────────────────────────────────
     //  Constructor
-    // ─────────────────────────────────────────────────────────────────────────
 
     public MainMenu(GameFrame owner) {
         this.owner = owner;
@@ -48,7 +40,7 @@ public class MainMenu extends JPanel implements ActionListener {
         setBackground(BG);
         setLayout(new BorderLayout());
 
-        // ── Centre: title art + blink prompt ──────────────────────────────────
+        // Center: title art + blink prompt
         JPanel centre = new JPanel() {
             @Override protected void paintComponent(Graphics g) {
                 super.paintComponent(g);
@@ -58,11 +50,11 @@ public class MainMenu extends JPanel implements ActionListener {
         centre.setOpaque(false);
         add(centre, BorderLayout.CENTER);
 
-        // ── Bottom: button row ────────────────────────────────────────────────
+        // Bottom: button row
         JPanel btnRow = buildButtonRow();
         add(btnRow, BorderLayout.SOUTH);
 
-        // ── Enter key shortcut ────────────────────────────────────────────────
+        // Enter key shortcut
         setFocusable(true);
         addKeyListener(new KeyAdapter() {
             @Override public void keyPressed(KeyEvent e) {
@@ -70,14 +62,12 @@ public class MainMenu extends JPanel implements ActionListener {
             }
         });
 
-        // ── Animation timer (10 FPS is enough for title effects) ─────────────
+        // Animation timer
         animTimer = new Timer(100, this);
         animTimer.start();
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
     //  Button row
-    // ─────────────────────────────────────────────────────────────────────────
 
     private JPanel buildButtonRow() {
         JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, 18, 14));
@@ -122,9 +112,7 @@ public class MainMenu extends JPanel implements ActionListener {
         return btn;
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
     //  Title painting
-    // ─────────────────────────────────────────────────────────────────────────
 
     private void paintTitle(Graphics2D g) {
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
@@ -132,18 +120,18 @@ public class MainMenu extends JPanel implements ActionListener {
 
         int w = getWidth(), h = getHeight();
 
-        // ── Background gradient ───────────────────────────────────────────────
+        // Background gradient
         GradientPaint grad = new GradientPaint(0, 0, new Color(20,0,0),
                                                0, h, BG);
         g.setPaint(grad);
         g.fillRect(0, 0, w, h);
 
-        // ── Decorative pixel grid ─────────────────────────────────────────────
+        // Decorative pixel grid
         g.setColor(new Color(30, 5, 5));
         for (int x = 0; x < w; x += 32) g.drawLine(x, 0, x, h);
         for (int y = 0; y < h; y += 32) g.drawLine(0, y, w, y);
 
-        // ── "BATTLE CITY" big pixel-style title ───────────────────────────────
+        //BATTLE CITY
         Color titleCol = (flickerStep % 4 == 0) ? TITLE_B : TITLE_A;
         Font titleFont = new Font("Monospaced", Font.BOLD, 64);
         g.setFont(titleFont);
@@ -166,7 +154,7 @@ public class MainMenu extends JPanel implements ActionListener {
         g.drawString(line1, x1, y1);
         g.drawString(line2, x2, y2);
 
-        // ── "PRESS ENTER TO START" blink ─────────────────────────────────────
+        //blink
         if (blinkOn) {
             g.setFont(new Font("Monospaced", Font.BOLD, 16));
             g.setColor(BLINK_COL);
@@ -176,19 +164,18 @@ public class MainMenu extends JPanel implements ActionListener {
             g.drawString(prompt, px, y2 + 80);
         }
 
-        // ── Sub-title / credits ───────────────────────────────────────────────
         g.setFont(new Font("Monospaced", Font.PLAIN, 11));
         g.setColor(new Color(120, 120, 120));
         String sub = "CSE212  ·  Yeditepe University  ·  Spring 2025";
         FontMetrics fm3 = g.getFontMetrics();
         g.drawString(sub, (w - fm3.stringWidth(sub)) / 2, h - 30);
 
-        // ── Small tank icons (decorative) ─────────────────────────────────────
+        //Small tank icons
         drawDecorativeTank(g, 60,  h / 2 + 30, Color.GREEN);
         drawDecorativeTank(g, w - 90, h / 2 + 30, Color.RED);
     }
 
-    /** Draws a tiny symbolic tank rectangle as decoration. */
+    /** Draws a tiny tank rectangle */
     private void drawDecorativeTank(Graphics2D g, int x, int y, Color c) {
         g.setColor(c);
         g.fillRect(x, y, 28, 22);          // body
@@ -198,9 +185,7 @@ public class MainMenu extends JPanel implements ActionListener {
         g.drawRect(x, y, 28, 22);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
     //  Animation timer tick
-    // ─────────────────────────────────────────────────────────────────────────
 
     @Override
     public void actionPerformed(ActionEvent e) {

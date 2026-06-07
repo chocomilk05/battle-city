@@ -6,13 +6,11 @@ import javax.swing.table.*;
 import java.awt.*;
 import java.util.List;
 
-/**
- * HighScoreScreen
- * ---------------
- * Modal dialog that reads the top-10 entries from scores.csv via
- * ScoreManager and displays them in a styled table.
- *
- * Shows: Rank | Name | Score | Date | Time
+/*
+  HighScoreScreen
+  Modal dialog that reads the top-10 entries from scores.csv via
+  ScoreManager and displays them
+  Shows: Rank  Name  Score  Date  Time
  */
 public class HighScoreScreen extends JDialog {
 
@@ -38,7 +36,7 @@ public class HighScoreScreen extends JDialog {
         setResizable(false);
     }
 
-    // ── Title ─────────────────────────────────────────────────────────────────
+    // Title
 
     private JPanel buildTitleBar() {
         JPanel p = new JPanel();
@@ -51,13 +49,12 @@ public class HighScoreScreen extends JDialog {
         return p;
     }
 
-    // ── Table ─────────────────────────────────────────────────────────────────
+    // Table
 
     private JScrollPane buildTable() {
         String[] columns = {"#", "Name", "Score", "Date", "Time"};
         List<ScoreEntry> entries = ScoreManager.loadTop(10);
 
-        // FIX: always show exactly 10 rows (pad with dashes if fewer entries)
         int ROWS = 10;
         Object[][] data = new Object[ROWS][5];
         for (int i = 0; i < ROWS; i++) {
@@ -85,7 +82,6 @@ public class HighScoreScreen extends JDialog {
             @Override
             public Component prepareRenderer(TableCellRenderer r, int row, int col) {
                 Component c = super.prepareRenderer(r, row, col);
-                // Medal tints for top 3
                 if      (row == 0) c.setBackground(new Color(60, 50, 0));
                 else if (row == 1) c.setBackground(new Color(40, 40, 40));
                 else if (row == 2) c.setBackground(new Color(40, 20, 0));
@@ -130,7 +126,7 @@ public class HighScoreScreen extends JDialog {
         return r;
     }
 
-    // ── Bottom buttons ────────────────────────────────────────────────────────
+    // Bottom buttons
 
     private JPanel buildCloseBar() {
         JPanel p = new JPanel();
@@ -145,7 +141,6 @@ public class HighScoreScreen extends JDialog {
             if (choice == JOptionPane.YES_OPTION) {
                 ScoreManager.clearAll();
                 dispose();
-                // FIX: getOwner() returns Window; cast safely to Frame
                 Frame owner = (Frame) getOwner();
                 new HighScoreScreen(owner).setVisible(true);
             }

@@ -4,7 +4,6 @@ import java.nio.file.*;
 import java.util.*;
 import java.util.stream.*;
 
-
 public class ScoreManager {
 
     public static final String CSV_FILE = "scores.csv";
@@ -42,7 +41,7 @@ public class ScoreManager {
             String line;
             boolean first = true;
             while ((line = br.readLine()) != null) {
-                if (first) { first = false; continue; } // skip header
+                if (first) { first = false; continue; }
                 line = line.trim();
                 if (line.isEmpty()) continue;
                 ScoreEntry e = parseLine(line);

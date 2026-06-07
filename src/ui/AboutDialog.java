@@ -2,23 +2,16 @@ package ui;
 import javax.swing.*;
 import java.awt.*;
 
-/**
- * AboutDialog
- * -----------
- * Small modal dialog that displays information about the developer
- * as required by the CSE212 project spec:
- *   Name, Surname, School Number, E-mail
- *
- * Edit the DEVELOPER_* constants below with your real details.
+/*
+  AboutDialog
+    Name, Surname, School Number, E-mail
  */
 public class AboutDialog extends JDialog {
 
-    // ── !! EDIT THESE WITH YOUR REAL INFO !! ─────────────────────────────────
     private static final String DEV_NAME    = "İrem Irmak";
     private static final String DEV_SURNAME = "Ünlüer";
     private static final String DEV_ID      = "20240702030";
     private static final String DEV_EMAIL   = "iremirmak.unluer@std.yeditepe.edu.tr";
-    // ─────────────────────────────────────────────────────────────────────────
 
     private static final Color BG       = new Color(10, 10, 10);
     private static final Color ACCENT   = new Color(255, 180, 0);
@@ -41,7 +34,7 @@ public class AboutDialog extends JDialog {
         setResizable(false);
     }
 
-    // ── Top banner ────────────────────────────────────────────────────────────
+    // Top banner
 
     private JPanel buildBanner() {
         JPanel p = new JPanel();
@@ -50,7 +43,7 @@ public class AboutDialog extends JDialog {
         p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
 
         JLabel title = centredLabel("BATTLE CITY", new Font("Monospaced", Font.BOLD, 26), ACCENT);
-        JLabel sub   = centredLabel("CSE212 Term Project  ·  Spring 2025",
+        JLabel sub   = centredLabel("CSE212 Term Project  ·  Spring 2026",
                                     new Font("Monospaced", Font.PLAIN, 12), FG);
         JLabel uni   = centredLabel("Yeditepe University",
                                     new Font("Monospaced", Font.ITALIC, 12),
@@ -62,7 +55,7 @@ public class AboutDialog extends JDialog {
         return p;
     }
 
-    // ── Developer info ────────────────────────────────────────────────────────
+    // Developer info ( oyunum calissaydi :( ))
 
     private JPanel buildInfo() {
         JPanel p = new JPanel(new GridBagLayout());
@@ -87,7 +80,7 @@ public class AboutDialog extends JDialog {
             {"E-mail",        DEV_EMAIL},
             {"Course",        "CSE212 Software Development Methodologies"},
             {"Instructor",    "Yeditepe University"},
-            {"Version",       "1.0.0"},
+            {"Version",       "demo"},
         };
 
         for (int i = 0; i < rows.length; i++) {

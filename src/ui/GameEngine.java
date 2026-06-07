@@ -1,6 +1,5 @@
 package ui;
 import entities.*;
-import map.*;
 import powerups.*;
 import java.awt.*;
 import java.awt.event.KeyEvent;
@@ -42,7 +41,7 @@ public class GameEngine {
 
     private int[][] savedBaseTiles;
 
-    // ── Level loading ─────────────────────────────────────────────────────────
+    // Level loading
 
     public void loadLevel(int levelNumber) {
         this.levelNumber         = levelNumber;
@@ -55,12 +54,10 @@ public class GameEngine {
         powerUps.clear();
 
         int[] spawnPos = currentLevel.getPlayerSpawnTile();
-        // FIX: pass a Map instance, not the class literal
         player = new PlayerTank(
             spawnPos[1] * GamePanel.TILE_SIZE,
             spawnPos[0] * GamePanel.TILE_SIZE,
-            null   // PlayerTank's Map param – movement collision uses Level tile data
-                   // via checkBulletVsTile / isSolid; pass null and guard in Tank.move
+            null
         );
 
         startSpawnerThread();
@@ -79,6 +76,11 @@ public class GameEngine {
                 } catch (InterruptedException ie) {
                     break;
                 }
+                while (spawnerRunning
+                        && totalEnemiesSpawned < TOTAL_ENEMIES_PER_LEVEL
+                        && enemies.size() >= MAX_ENEMIES_ON_SCREEN) {
+                    try { Thread.sleep(500); } catch (InterruptedException ie) { break; }
+                }
                 if (spawnerRunning) {
                     spawnEnemy();
                 }
@@ -95,8 +97,6 @@ public class GameEngine {
         int[][] spawnPoints = currentLevel.getEnemySpawnPoints();
         int[]   pt          = spawnPoints[totalEnemiesSpawned % spawnPoints.length];
 
-        // FIX: pt[0]=row, pt[1]=col; convert to pixels. Complete the broken statement
-        //      and pass real args (no Map object available here – pass null, same as player).
         int speed = (levelNumber == 1) ? EnemyTank.SPEED_EASY
                   : (levelNumber == 2) ? EnemyTank.SPEED_MEDIUM
                   :                      EnemyTank.SPEED_HARD;
@@ -108,7 +108,7 @@ public class GameEngine {
             pt[1] * GamePanel.TILE_SIZE,
             pt[0] * GamePanel.TILE_SIZE,
             speed,
-            null,       // Map – same situation as player
+            null,
             player,
             baseCol * GamePanel.TILE_SIZE,
             baseRow * GamePanel.TILE_SIZE
@@ -117,7 +117,7 @@ public class GameEngine {
         totalEnemiesSpawned++;
     }
 
-    // ── Per-tick update ───────────────────────────────────────────────────────
+    // Per-tick update
 
     public void update() {
         if (gameOver || levelComplete) return;
@@ -129,15 +129,12 @@ public class GameEngine {
         checkLevelComplete();
     }
 
-    // FIX: original condition was inverted — it skipped update when NOT destroyed
     private void updatePlayer() {
         if (player == null || player.isDestroyed()) return;
         player.update();
     }
 
     private void updateEnemies() {
-        // When clock is frozen enemies still need to be checked for removal,
-        // but we skip movement/shooting by not calling e.update().
         Iterator<EnemyTank> it = enemies.iterator();
         while (it.hasNext()) {
             EnemyTank e = it.next();
@@ -151,10 +148,9 @@ public class GameEngine {
         }
     }
 
-    // ── Bullet collision ──────────────────────────────────────────────────────
+    // Bullet collision
 
     private void checkBulletCollisions() {
-        // Collect all active bullets from player + every enemy
         List<Bullet> allBullets = new ArrayList<>();
         if (player != null && !player.isDestroyed()) {
             allBullets.addAll(player.getBullets());
@@ -168,11 +164,10 @@ public class GameEngine {
         for (Bullet b : allBullets) {
             if (!b.isActive() || toDeactivate.contains(b)) continue;
 
-            // --- Tile collision (already handled inside Bullet.update via Map,
-            //     but GameEngine also resolves it against Level int[][] here)
-            if (!b.isActive()) continue;   // Bullet.update may have deactivated it
+            //Tile collision
+            if (!b.isActive()) continue;
 
-            // --- Player bullet hits enemy tank
+            //Player bullet hits enemy tank
             if (b.isFromPlayer()) {
                 for (EnemyTank enemy : enemies) {
                     if (enemy.isDestroyed()) continue;
@@ -190,7 +185,7 @@ public class GameEngine {
                 }
             }
 
-            // --- Enemy bullet hits player
+            //Enemy bullet hits player
             if (!b.isFromPlayer() && player != null
                     && !player.isDestroyed() && !player.isShielded()) {
                 if (b.intersects(player.getX(), player.getY(), Tank.SIZE, Tank.SIZE)) {
@@ -199,7 +194,7 @@ public class GameEngine {
                 }
             }
 
-            // --- Enemy bullet hits base  FIX: use 4-int intersects, not Rectangle overload
+            //Enemy bullet hits base
             if (!b.isFromPlayer()) {
                 int basePixelX = currentLevel.getBaseCol() * GamePanel.TILE_SIZE;
                 int basePixelY = currentLevel.getBaseRow() * GamePanel.TILE_SIZE;
@@ -210,7 +205,7 @@ public class GameEngine {
                 }
             }
 
-            // --- Opposite bullets cancel each other
+            //Opposite bullets cancel each other out
             for (Bullet other : allBullets) {
                 if (other == b || toDeactivate.contains(other)) continue;
                 if (b.isFromPlayer() != other.isFromPlayer()
@@ -225,7 +220,7 @@ public class GameEngine {
         for (Bullet b : toDeactivate) b.deactivate();
     }
 
-    // ── Player hit / game-over ────────────────────────────────────────────────
+    // Player hit
 
     private void handlePlayerHit() {
         lives--;
@@ -233,7 +228,6 @@ public class GameEngine {
             triggerGameOver();
         } else {
             int[] spawn = currentLevel.getPlayerSpawnTile();
-            // FIX: respawn(int, int) – two args, not three
             player.respawn(
                 spawn[1] * GamePanel.TILE_SIZE,
                 spawn[0] * GamePanel.TILE_SIZE
@@ -247,20 +241,18 @@ public class GameEngine {
         if (spawnerThread != null) spawnerThread.interrupt();
     }
 
-    // ── Player–enemy body collision ───────────────────────────────────────────
+    // Player–enemy body collision
 
     private void checkPlayerEnemyCollisions() {
         if (player == null || player.isDestroyed()) return;
         for (EnemyTank enemy : enemies) {
             if (!enemy.isDestroyed()
                     && player.intersects(enemy.getX(), enemy.getY(), Tank.SIZE, Tank.SIZE)) {
-                // Push-back: player is not destroyed by contact in classic rules,
-                // but you can call handlePlayerHit() here if you want contact damage.
             }
         }
     }
 
-    // ── Power-up collection ───────────────────────────────────────────────────
+    // Power-up collection
 
     private void checkPowerUpCollections() {
         if (player == null || player.isDestroyed()) return;
@@ -293,7 +285,6 @@ public class GameEngine {
         if (Math.random() < 0.25) {
             PowerUp.Type[] types = PowerUp.Type.values();
             PowerUp.Type t = types[(int)(Math.random() * types.length)];
-            // FIX: PowerUp constructor is protected; use concrete subclasses
             PowerUp pu;
             switch (t) {
                 case BOMB   -> pu = new BombPowerUp(x, y);
@@ -307,7 +298,7 @@ public class GameEngine {
         }
     }
 
-    // ── Level-complete check ──────────────────────────────────────────────────
+    // Level-complete check
 
     private void checkLevelComplete() {
         if (totalEnemiesSpawned >= TOTAL_ENEMIES_PER_LEVEL && enemies.isEmpty()) {
@@ -316,7 +307,7 @@ public class GameEngine {
         }
     }
 
-    // ── Power-up timers (background threads) ─────────────────────────────────
+    // Power-up timers
 
     private void startClockFreeze() {
         clockFrozen = true;
@@ -374,21 +365,12 @@ public class GameEngine {
         shieldThread.start();
     }
 
-    // ── Input handling ────────────────────────────────────────────────────────
+    // Input handling
 
-    /**
-     * Called by GamePanel each tick with the currently held keys.
-     * Movement + fire are forwarded to PlayerTank; PlayerTank.update()
-     * actually moves/fires so we only set direction here.
-     */
     public void handleInput(Set<Integer> keysHeld) {
         if (player == null || player.isDestroyed() || gameOver || levelComplete) return;
 
-        // Forward key state directly; PlayerTank.update() reads keysHeld internally
         for (int key : keysHeld) player.keyPressed(key);
-        // Clear keys not currently held (delta approach isn't available here,
-        // so instead we push the full set via the existing keyPressed/keyReleased API)
-        // Simpler: expose a setKeysHeld, or just set direction here for movement.
         if      (keysHeld.contains(KeyEvent.VK_W) || keysHeld.contains(KeyEvent.VK_UP))
             player.setDirection(Tank.UP);
         else if (keysHeld.contains(KeyEvent.VK_S) || keysHeld.contains(KeyEvent.VK_DOWN))
@@ -399,14 +381,13 @@ public class GameEngine {
             player.setDirection(Tank.RIGHT);
     }
 
-    // ── Rendering ─────────────────────────────────────────────────────────────
+    // Rendering
 
     public void render(Graphics2D g) {
         for (PowerUp pu : powerUps)  pu.draw(g);
         for (EnemyTank e : enemies)  e.draw(g);
         if (player != null)           player.draw(g);
 
-        // Draw all bullets
         if (player != null) {
             for (Bullet b : player.getBullets()) b.draw(g);
         }
@@ -432,7 +413,7 @@ public class GameEngine {
         }
     }
 
-    // ── Getters ───────────────────────────────────────────────────────────────
+    // Getters
 
     public Level   getCurrentLevel()     { return currentLevel; }
     public int     getLevelNumber()      { return levelNumber; }
@@ -445,8 +426,6 @@ public class GameEngine {
     public boolean isShovelActive()      { return shovelThread != null && shovelThread.isAlive(); }
     public int     getPlayerStars()      { return player != null ? player.getStarLevel() : 0; }
 
-    // FIX: original formula was broken (subtracted negatives). Correct: enemies
-    // not yet spawned + enemies still on screen.
     public int getRemainingEnemies() {
         return (TOTAL_ENEMIES_PER_LEVEL - totalEnemiesSpawned) + enemies.size();
     }

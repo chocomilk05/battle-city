@@ -2,11 +2,9 @@ package powerups;
 
 import java.awt.*;
 
-/**
- * BombPowerUp
- * -----------
- * Instantly destroys every enemy tank currently visible on the map.
- * GameEngine iterates the enemy list and calls kill() on each.
+/*
+  Instantly destroys every enemy tank currently visible on the map
+  GameEngine iterates the enemy list and calls kill() on each
  */
 public class BombPowerUp extends PowerUp {
 
@@ -14,12 +12,10 @@ public class BombPowerUp extends PowerUp {
         super(x, y, Type.BOMB);
     }
 
-    /** Custom draw: red background with explosion-burst lines. */
     @Override
     public void draw(Graphics g) {
-        super.draw(g);  // base blink + "✦" label
+        super.draw(g); 
 
-        // Burst rays around the centre
         int cx = getX() + SIZE / 2;
         int cy = getY() + SIZE / 2;
         g.setColor(new Color(255, 200, 0, 160));

@@ -2,11 +2,9 @@ package powerups;
 
 import java.awt.*;
 
-/**
- * ShieldPowerUp
- * -------------
- * Makes the player tank invulnerable for SHIELD_DURATION_MS (GameEngine).
- * While shielded, the tank displays a cyan aura and ignores all bullet hits.
+/*
+ ShieldPowerUp
+ Makes the player tank invulnerable
  */
 public class ShieldPowerUp extends PowerUp {
 
@@ -14,12 +12,10 @@ public class ShieldPowerUp extends PowerUp {
         super(x, y, Type.SHIELD);
     }
 
-    /** Custom draw: cyan background with a shield outline. */
     @Override
     public void draw(Graphics g) {
-        super.draw(g);  // base blink + "⛨" label
+        super.draw(g);
 
-        // Shield arc decoration
         int sx = getX() + 6;
         int sy = getY() + 4;
         int sw = SIZE - 12;

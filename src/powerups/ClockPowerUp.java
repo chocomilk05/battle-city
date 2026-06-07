@@ -2,33 +2,25 @@ package powerups;
 
 import java.awt.*;
 
-/**
- * ClockPowerUp
- * ------------
- * Freezes all enemy tanks for a fixed duration (CLOCK_FREEZE_MS in GameEngine).
- * While frozen, enemies cannot move or shoot.
- * The clockFrozen flag in GameEngine is what actually stops enemy updates.
- */
+// Freezes all enemy tanks for a fixed duration (CLOCK_FREEZE_MS in GameEngine)
+ 
 public class ClockPowerUp extends PowerUp {
 
     public ClockPowerUp(int x, int y) {
         super(x, y, Type.CLOCK);
     }
 
-    /** Custom draw: blue background with a simple clock face. */
     @Override
     public void draw(Graphics g) {
-        super.draw(g);  // base blink + "⏱" label
+        super.draw(g);
 
-        // Clock circle
         int cx = getX() + SIZE / 2;
         int cy = getY() + SIZE / 2 + 2;
         g.setColor(new Color(200, 230, 255, 120));
         g.drawOval(cx - 7, cy - 7, 14, 14);
 
-        // Clock hands
         g.setColor(Color.WHITE);
-        g.drawLine(cx, cy, cx,     cy - 5);  // minute hand (up)
-        g.drawLine(cx, cy, cx + 4, cy);      // hour hand (right)
+        g.drawLine(cx, cy, cx,     cy - 5);  // minute hand
+        g.drawLine(cx, cy, cx + 4, cy);      // hour hand
     }
 }

@@ -1,81 +1,64 @@
 package ui;
-import javax.swing.*;
 
+import util.SpriteRegistry;
+import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.awt.image.BufferedImage;
 import java.util.Set;
 import java.util.HashSet;
 
-/**
- * GamePanel
- * ---------
- * The main rendering surface and game-loop driver for Battle City.
- *
- * Responsibilities:
- *  - Owns the Swing Timer that ticks the game at ~60 FPS.
- *  - Delegates all logic updates to GameEngine.
- *  - Paints the current Level map, all tanks, bullets, power-ups, HUD, etc.
- *  - Forwards keyboard input to the engine.
- *  - Exposes pause/resume/stop controls used by the parent JFrame menu.
- */
+// GamePanel
+ 
 public class GamePanel extends JPanel implements ActionListener, KeyListener {
 
-    // ── Constants ────────────────────────────────────────────────────────────
-    public static final int TILE_SIZE   = 32;   // px per map tile
-    public static final int COLS        = 26;   // map columns
-    public static final int ROWS        = 26;   // map rows
-    public static final int MAP_WIDTH   = COLS * TILE_SIZE;   // 832
-    public static final int MAP_HEIGHT  = ROWS * TILE_SIZE;   // 832
-    public static final int HUD_WIDTH   = 120;  // right-side HUD strip
-    public static final int FPS         = 60;
-    public static final int TICK_MS     = 1000 / FPS;
+    // Constants
+    public static final int TILE_SIZE  = 32;
+    public static final int COLS       = 26;
+    public static final int ROWS       = 26;
+    public static final int MAP_WIDTH  = COLS * TILE_SIZE;   // 832
+    public static final int MAP_HEIGHT = ROWS * TILE_SIZE;   // 832
+    public static final int HUD_WIDTH  = 120;
+    public static final int FPS        = 60;
+    public static final int TICK_MS    = 1000 / FPS;
 
-    // ── Core references ──────────────────────────────────────────────────────
+    // Core references
     private final GameEngine engine;
     private final Timer      gameTimer;
 
-    // ── Keyboard state ───────────────────────────────────────────────────────
-    /** Keys currently held down (by keyCode). */
+    // Keyboard state
     private final Set<Integer> keysHeld = new HashSet<>();
 
-    // ── Images / sprites  (loaded lazily or via SpriteSheet) ─────────────────
-    // Replace with real sprite loading once you have the image pack.
-    // private SpriteSheet sprites;
-
-    // ── State flags ──────────────────────────────────────────────────────────
+    // State flags
     private boolean paused = false;
 
-    // ─────────────────────────────────────────────────────────────────────────
-    //  Constructor
-    // ─────────────────────────────────────────────────────────────────────────
+    // Water animation
+    private boolean waterFrame = false;
+    private int     waterTick  = 0;
 
-    /**
-     * @param engine The fully-constructed game engine to drive.
-     */
+    //  Constructor
+
     public GamePanel(GameEngine engine) {
         this.engine = engine;
+
+        SpriteRegistry.load();
 
         setPreferredSize(new Dimension(MAP_WIDTH + HUD_WIDTH, MAP_HEIGHT));
         setBackground(Color.BLACK);
         setFocusable(true);
         addKeyListener(this);
 
-        // Timer drives the game loop.
         gameTimer = new Timer(TICK_MS, this);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    //  Game-loop control
-    // ─────────────────────────────────────────────────────────────────────────
+    // Game-loop control
 
-    /** Start (or restart) the game loop. */
     public void startGame() {
         paused = false;
         gameTimer.start();
         requestFocusInWindow();
     }
 
-    /** Pause / resume toggle. */
     public void togglePause() {
         paused = !paused;
         if (paused) gameTimer.stop();
@@ -85,27 +68,18 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
 
     public boolean isPaused() { return paused; }
 
-    /** Permanently stop the game (called on game-over or exit). */
     public void stopGame() {
         gameTimer.stop();
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    //  ActionListener – Swing Timer tick
-    // ─────────────────────────────────────────────────────────────────────────
+    //ActionListener
 
     @Override
     public void actionPerformed(ActionEvent e) {
-        // 1. Feed held keys into the engine so movement is smooth.
         engine.handleInput(keysHeld);
-
-        // 2. Advance all game logic by one frame.
         engine.update();
-
-        // 3. Schedule a repaint.
         repaint();
 
-        // 4. Check terminal conditions.
         if (engine.isGameOver()) {
             stopGame();
             firePropertyChange("GAME_OVER", false, true);
@@ -115,31 +89,24 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
         }
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    //  Painting
-    // ─────────────────────────────────────────────────────────────────────────
+    // Painting
 
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
         Graphics2D g2 = (Graphics2D) g;
 
-        // — Map / terrain —
+        waterTick++;
+        if (waterTick >= 30) { waterTick = 0; waterFrame = !waterFrame; }
+
         drawMap(g2);
-
-        // — Game entities (tanks, bullets, power-ups) —
         engine.render(g2);
-
-        // — HUD panel on the right —
         drawHUD(g2);
-
-        // — Pause overlay —
         if (paused) drawPauseOverlay(g2);
     }
 
-    /**
-     * Draws the tile-based map from the current Level.
-     */
+    // Map drawing
+
     private void drawMap(Graphics2D g) {
         Level level = engine.getCurrentLevel();
         if (level == null) return;
@@ -147,54 +114,76 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
         int[][] map = level.getMap();
         for (int row = 0; row < ROWS; row++) {
             for (int col = 0; col < COLS; col++) {
-                int tileType = map[row][col];
-                int x = col * TILE_SIZE;
-                int y = row * TILE_SIZE;
-                drawTile(g, tileType, x, y);
+                drawTile(g, map[row][col], col * TILE_SIZE, row * TILE_SIZE);
             }
         }
     }
 
-    /**
-     * Renders a single map tile.
-     * Replace the colour fill with sprite draws once you have the image pack.
-     *
-     * Tile type constants are defined in Level:
-     *   Level.EMPTY, BRICK, STEEL, WATER, BUSH, BASE
-     */
     private void drawTile(Graphics2D g, int type, int x, int y) {
         switch (type) {
-            case Level.EMPTY -> { /* black background already drawn */ }
+
+            case Level.EMPTY -> {}
+
             case Level.BRICK -> {
-                g.setColor(new Color(180, 80, 0));
-                g.fillRect(x, y, TILE_SIZE, TILE_SIZE);
-                g.setColor(new Color(100, 40, 0));
-                g.drawRect(x, y, TILE_SIZE - 1, TILE_SIZE - 1);
+                BufferedImage img = SpriteRegistry.TILE_BRICK;
+                if (img != null) {
+                    g.drawImage(img, x, y, TILE_SIZE, TILE_SIZE, null);
+                } else {
+                    g.setColor(new Color(180, 80, 0));
+                    g.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                    g.setColor(new Color(100, 40, 0));
+                    g.drawRect(x, y, TILE_SIZE - 1, TILE_SIZE - 1);
+                }
             }
+
             case Level.STEEL -> {
-                g.setColor(new Color(160, 160, 160));
-                g.fillRect(x, y, TILE_SIZE, TILE_SIZE);
-                g.setColor(Color.WHITE);
-                g.drawRect(x, y, TILE_SIZE - 1, TILE_SIZE - 1);
+                BufferedImage img = SpriteRegistry.TILE_STEEL;
+                if (img != null) {
+                    g.drawImage(img, x, y, TILE_SIZE, TILE_SIZE, null);
+                } else {
+                    g.setColor(new Color(160, 160, 160));
+                    g.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                    g.setColor(Color.WHITE);
+                    g.drawRect(x, y, TILE_SIZE - 1, TILE_SIZE - 1);
+                }
             }
+
             case Level.WATER -> {
-                g.setColor(new Color(0, 100, 200));
-                g.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                // Alternate between frame 1 and frame 2 for a ripple effect
+                BufferedImage img = waterFrame
+                        ? SpriteRegistry.TILE_WATER_2
+                        : SpriteRegistry.TILE_WATER_1;
+                if (img == null) img = SpriteRegistry.TILE_WATER_1; // fallback to frame 1
+                if (img != null) {
+                    g.drawImage(img, x, y, TILE_SIZE, TILE_SIZE, null);
+                } else {
+                    g.setColor(new Color(0, 100, 200));
+                    g.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                }
             }
+
             case Level.BUSH -> {
-                // Drawn last so it covers tanks (engine.render draws bushes second pass).
-                g.setColor(new Color(0, 160, 0));
-                g.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                BufferedImage img = SpriteRegistry.TILE_BUSH;
+                if (img != null) {
+                    g.drawImage(img, x, y, TILE_SIZE, TILE_SIZE, null);
+                } else {
+                    g.setColor(new Color(0, 160, 0));
+                    g.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                }
             }
+
             case Level.BASE -> {
-                g.setColor(Color.YELLOW);
-                // Simple star/eagle placeholder.
-                int cx = x + TILE_SIZE / 2, cy = y + TILE_SIZE / 2;
-                int r = TILE_SIZE / 2 - 2;
-                g.fillOval(cx - r, cy - r, 2 * r, 2 * r);
-                g.setColor(Color.BLACK);
-                g.drawString("⬛", x + 4, y + TILE_SIZE - 4);
+                BufferedImage img = SpriteRegistry.TILE_BASE_ALIVE;
+                if (img != null) {
+                    g.drawImage(img, x, y, TILE_SIZE, TILE_SIZE, null);
+                } else {
+                    g.setColor(Color.YELLOW);
+                    int cx = x + TILE_SIZE / 2, cy = y + TILE_SIZE / 2;
+                    int r = TILE_SIZE / 2 - 2;
+                    g.fillOval(cx - r, cy - r, 2 * r, 2 * r);
+                }
             }
+
             default -> {
                 g.setColor(Color.DARK_GRAY);
                 g.fillRect(x, y, TILE_SIZE, TILE_SIZE);
@@ -202,9 +191,8 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
         }
     }
 
-    /**
-     * Draws the right-side HUD: lives, enemy count, level number, score.
-     */
+    // HUD
+
     private void drawHUD(Graphics2D g) {
         int hx = MAP_WIDTH + 4;
         g.setColor(new Color(40, 40, 40));
@@ -242,7 +230,6 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
         g.setColor(Color.RED);
         g.drawString("x " + engine.getRemainingEnemies(), hx, y);
 
-        // Stars (power-up level)
         y += 30;
         g.setColor(Color.WHITE);
         g.drawString("STARS", hx, y);
@@ -254,7 +241,8 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
         }
     }
 
-    /** Semi-transparent "PAUSED" overlay. */
+    // Pause overlay
+
     private void drawPauseOverlay(Graphics2D g) {
         g.setColor(new Color(0, 0, 0, 140));
         g.fillRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
@@ -262,30 +250,22 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
         g.setFont(new Font("Monospaced", Font.BOLD, 36));
         FontMetrics fm = g.getFontMetrics();
         String msg = "PAUSED";
-        int tx = (MAP_WIDTH - fm.stringWidth(msg)) / 2;
-        int ty = MAP_HEIGHT / 2;
-        g.drawString(msg, tx, ty);
+        g.drawString(msg, (MAP_WIDTH - fm.stringWidth(msg)) / 2, MAP_HEIGHT / 2);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    //  KeyListener
-    // ─────────────────────────────────────────────────────────────────────────
+    // KeyListener
 
     @Override
     public void keyPressed(KeyEvent e) {
         keysHeld.add(e.getKeyCode());
-
-        // Pause shortcut: Escape or P
         if (e.getKeyCode() == KeyEvent.VK_ESCAPE || e.getKeyCode() == KeyEvent.VK_P) {
             togglePause();
         }
     }
 
     @Override
-    public void keyReleased(KeyEvent e) {
-        keysHeld.remove(e.getKeyCode());
-    }
+    public void keyReleased(KeyEvent e) { keysHeld.remove(e.getKeyCode()); }
 
     @Override
-    public void keyTyped(KeyEvent e) { /* unused */ }
+    public void keyTyped(KeyEvent e) {}
 }
