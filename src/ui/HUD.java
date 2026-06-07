@@ -9,90 +9,56 @@ import java.awt.*;
  * HUD
  * ---
  * Paints the right-side heads-up display during gameplay.
- *
- * Displays (top to bottom):
- *  - Current score
- *  - High score (loaded once from ScoreManager)
- *  - Level number
- *  - Remaining enemy count (tank icons)
- *  - Player lives (tank icons)
- *  - Star power-up level (★ filled / empty)
- *  - Active power-up indicator (Clock / Shield / Shovel)
- *  - "PAUSED" banner when the game is paused
- *
- * Usage:
- *   HUD hud = new HUD();
- *   // in GamePanel.paintComponent:
- *   hud.draw(g2, engine, isPaused());
- *
- * HUD is a plain helper object – it does NOT extend JComponent
- * so it can be called directly inside GamePanel.paintComponent
- * without adding another child panel. This avoids double-buffering
- * artefacts and keeps the rendering pipeline simple.
+ * Call hud.draw(g2, engine, isPaused()) inside GamePanel.paintComponent,
+ * AFTER drawing the map and entities.
  */
 public class HUD {
 
-    // ── Layout constants ──────────────────────────────────────────────────────
-    /** X pixel where the HUD strip starts (= MAP_WIDTH). */
-    private static final int X       = GamePanel.MAP_WIDTH;
-    /** Total width of the HUD strip. */
-    private static final int W       = GamePanel.HUD_WIDTH;
-    /** Horizontal padding inside the strip. */
-    private static final int PAD     = 8;
-    /** Usable inner X. */
-    private static final int IX      = X + PAD;
-    /** Usable inner width. */
-    private static final int IW      = W - PAD * 2;
+    // ── Layout ────────────────────────────────────────────────────────────────
+    private static final int X   = GamePanel.MAP_WIDTH;
+    private static final int W   = GamePanel.HUD_WIDTH;
+    private static final int PAD = 8;
+    private static final int IX  = X + PAD;
+    private static final int IW  = W - PAD * 2;
 
     // ── Colours ───────────────────────────────────────────────────────────────
-    private static final Color BG           = new Color(28, 14, 0);
-    private static final Color BORDER_COL   = new Color(100, 40, 0);
-    private static final Color LABEL_COL    = new Color(160, 120, 60);
-    private static final Color VALUE_COL    = Color.ORANGE;
-    private static final Color SCORE_COL    = new Color(255, 220, 60);
-    private static final Color ENEMY_COL    = new Color(220, 60, 60);
-    private static final Color LIFE_COL     = new Color(60, 220, 60);
-    private static final Color STAR_ON      = new Color(255, 215, 0);
-    private static final Color STAR_OFF     = new Color(60, 50, 20);
-    private static final Color SECTION_LINE = new Color(80, 30, 0);
-    private static final Color PAUSE_BG     = new Color(0, 0, 0, 180);
-    private static final Color PAUSE_FG     = Color.WHITE;
+    private static final Color BG            = new Color(28, 14, 0);
+    private static final Color BORDER_COL    = new Color(100, 40, 0);
+    private static final Color LABEL_COL     = new Color(160, 120, 60);
+    private static final Color SCORE_COL     = new Color(255, 220, 60);
+    private static final Color ENEMY_COL     = new Color(220, 60, 60);
+    private static final Color LIFE_COL      = new Color(60, 220, 60);
+    private static final Color STAR_ON       = new Color(255, 215, 0);
+    private static final Color STAR_OFF      = new Color(60, 50, 20);
+    private static final Color SECTION_LINE  = new Color(80, 30, 0);
+    private static final Color PAUSE_BG      = new Color(0, 0, 0, 180);
     private static final Color POWERUP_ACTIVE = new Color(100, 255, 100);
 
     // ── Fonts ─────────────────────────────────────────────────────────────────
-    private static final Font F_LABEL  = new Font("Monospaced", Font.BOLD,  11);
-    private static final Font F_VALUE  = new Font("Monospaced", Font.BOLD,  16);
-    private static final Font F_SMALL  = new Font("Monospaced", Font.PLAIN, 11);
-    private static final Font F_SCORE  = new Font("Monospaced", Font.BOLD,  14);
-    private static final Font F_PAUSE  = new Font("Monospaced", Font.BOLD,  15);
-    private static final Font F_STAR   = new Font("Dialog",     Font.PLAIN, 18);
+    private static final Font F_LABEL = new Font("Monospaced", Font.BOLD,  11);
+    private static final Font F_VALUE = new Font("Monospaced", Font.BOLD,  16);
+    private static final Font F_SMALL = new Font("Monospaced", Font.PLAIN, 11);
+    private static final Font F_SCORE = new Font("Monospaced", Font.BOLD,  14);
+    private static final Font F_PAUSE = new Font("Monospaced", Font.BOLD,  15);
+    private static final Font F_STAR  = new Font("Dialog",     Font.PLAIN, 18);
 
-    // ── Cached high score (read once per session) ─────────────────────────────
+    // ── Cached high score (read once per session, updated if beaten) ──────────
     private int cachedHighScore = -1;
 
     // ─────────────────────────────────────────────────────────────────────────
     //  Main draw entry point
     // ─────────────────────────────────────────────────────────────────────────
 
-    /**
-     * Draw the full HUD strip onto the provided Graphics2D context.
-     * Call this inside {@link GamePanel#paintComponent(Graphics)} after
-     * the map and entities have been drawn.
-     *
-     * @param g       the graphics context (already translated to panel origin)
-     * @param engine  the live game engine to read state from
-     * @param paused  whether the game is currently paused
-     */
     public void draw(Graphics2D g, GameEngine engine, boolean paused) {
         enableAA(g);
 
-        // ── Background strip ──────────────────────────────────────────────────
+        // Background strip + left border
         g.setColor(BG);
         g.fillRect(X, 0, W, GamePanel.MAP_HEIGHT);
         g.setColor(BORDER_COL);
         g.drawLine(X, 0, X, GamePanel.MAP_HEIGHT);
 
-        int y = 18;   // running vertical cursor
+        int y = 18;
 
         // ── SCORE ─────────────────────────────────────────────────────────────
         y = drawSection(g, y, "SCORE");
@@ -120,26 +86,27 @@ public class HUD {
         g.drawString(String.valueOf(engine.getLevelNumber()), IX, y);
         y += 6;
 
-        // ── ENEMY TANKS remaining ─────────────────────────────────────────────
+        // ── ENEMY ─────────────────────────────────────────────────────────────
         y = separator(g, y);
         y = drawSection(g, y, "ENEMY");
-        y = drawTankIcons(g, y, engine.getRemainingEnemies(), ENEMY_COL, 20);
+        // FIX: clamp to 0 so it never shows negative when all enemies are gone
+        int remaining = Math.max(0, engine.getRemainingEnemies());
+        y = drawTankIcons(g, y, remaining, ENEMY_COL, 20);
         y += 4;
 
-        // ── PLAYER LIVES ──────────────────────────────────────────────────────
+        // ── LIVES ─────────────────────────────────────────────────────────────
         y = separator(g, y);
         y = drawSection(g, y, "LIVES");
         y = drawTankIcons(g, y, engine.getLives(), LIFE_COL, 3);
         y += 4;
 
-        // ── STAR POWER level ──────────────────────────────────────────────────
+        // ── STARS ─────────────────────────────────────────────────────────────
         y = separator(g, y);
         y = drawSection(g, y, "STARS");
         y = drawStars(g, y, engine.getPlayerStars());
         y += 4;
 
-        // ── Active power-up indicator ─────────────────────────────────────────
-        // (Clock / Shield / Shovel – GameEngine exposes these flags)
+        // ── ACTIVE POWER-UP ───────────────────────────────────────────────────
         y = separator(g, y);
         drawActivePowerUp(g, y, engine);
 
@@ -147,21 +114,15 @@ public class HUD {
         if (paused) drawPauseBanner(g);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    //  Section helpers
-    // ─────────────────────────────────────────────────────────────────────────
+    // ── Section helpers ───────────────────────────────────────────────────────
 
-    /**
-     * Draw a small section label and return the Y coordinate for the value.
-     */
     private int drawSection(Graphics2D g, int y, String label) {
         g.setFont(F_LABEL);
         g.setColor(LABEL_COL);
         g.drawString(label, IX, y);
-        return y + 16;   // value sits 16 px below the label
+        return y + 16;
     }
 
-    /** Draw a thin separator line and return new y. */
     private int separator(Graphics2D g, int y) {
         y += 6;
         g.setColor(SECTION_LINE);
@@ -169,29 +130,16 @@ public class HUD {
         return y + 8;
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    //  Tank icon grid
-    // ─────────────────────────────────────────────────────────────────────────
+    // ── Tank icon grid ────────────────────────────────────────────────────────
 
-    /**
-     * Draw small tank silhouettes in a 2-column grid.
-     *
-     * @param count   number of tanks to show
-     * @param colour  fill colour
-     * @param cap     maximum to show (excess shown as "+N more")
-     * @return new y cursor after all icons
-     */
     private int drawTankIcons(Graphics2D g, int y, int count, Color colour, int cap) {
         int shown = Math.min(count, cap);
-        int cols  = 2;
-        int tw = 14, th = 11, hgap = 4, vgap = 4;
+        int cols = 2, tw = 14, th = 11, hgap = 4, vgap = 4;
 
         for (int i = 0; i < shown; i++) {
             int col = i % cols;
             int row = i / cols;
-            int tx  = IX + col * (tw + hgap);
-            int ty  = y  + row * (th + vgap);
-            drawMiniTank(g, tx, ty, colour);
+            drawMiniTank(g, IX + col * (tw + hgap), y + row * (th + vgap), colour);
         }
 
         int rows = (shown + cols - 1) / cols;
@@ -203,23 +151,19 @@ public class HUD {
             g.drawString("+" + (count - cap), IX, newY + 12);
             newY += 14;
         }
-
         return newY;
     }
 
-    /** Draw a tiny symbolic tank (body + turret + barrel). */
     private void drawMiniTank(Graphics2D g, int x, int y, Color c) {
         g.setColor(c);
-        g.fillRect(x,     y + 3,  14, 8);  // body
-        g.fillRect(x + 4, y,      6,  5);  // turret
-        g.fillRect(x + 6, y - 3,  2,  5);  // barrel
+        g.fillRect(x,     y + 3, 14, 8);
+        g.fillRect(x + 4, y,      6,  5);
+        g.fillRect(x + 6, y - 3,  2,  5);
         g.setColor(c.darker());
         g.drawRect(x, y + 3, 14, 8);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    //  Star display
-    // ─────────────────────────────────────────────────────────────────────────
+    // ── Stars ─────────────────────────────────────────────────────────────────
 
     private int drawStars(Graphics2D g, int y, int starCount) {
         g.setFont(F_STAR);
@@ -230,9 +174,7 @@ public class HUD {
         return y + 6;
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    //  Active power-up indicator
-    // ─────────────────────────────────────────────────────────────────────────
+    // ── Active power-up indicator ─────────────────────────────────────────────
 
     private void drawActivePowerUp(Graphics2D g, int y, GameEngine engine) {
         g.setFont(F_LABEL);
@@ -245,17 +187,17 @@ public class HUD {
 
         if (engine.isClockActive()) {
             g.setColor(POWERUP_ACTIVE);
-            g.drawString("🕐 CLOCK", IX, y);
+            g.drawString("CLOCK", IX, y);
             y += 14; any = true;
         }
         if (engine.isShieldActive()) {
             g.setColor(new Color(100, 180, 255));
-            g.drawString("🛡 SHIELD", IX, y);
+            g.drawString("SHIELD", IX, y);
             y += 14; any = true;
         }
         if (engine.isShovelActive()) {
             g.setColor(new Color(200, 140, 60));
-            g.drawString("⛏ SHOVEL", IX, y);
+            g.drawString("SHOVEL", IX, y);
             any = true;
         }
         if (!any) {
@@ -264,23 +206,19 @@ public class HUD {
         }
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    //  Pause banner
-    // ─────────────────────────────────────────────────────────────────────────
+    // ── Pause banner ──────────────────────────────────────────────────────────
 
     private void drawPauseBanner(Graphics2D g) {
-        // Only covers the HUD strip
         g.setColor(PAUSE_BG);
         g.fillRect(X, 0, W, GamePanel.MAP_HEIGHT);
 
         g.setFont(F_PAUSE);
-        g.setColor(PAUSE_FG);
+        g.setColor(Color.WHITE);
         FontMetrics fm = g.getFontMetrics();
 
         String[] lines = {"", "PAUSE", "", "P / ESC", "to resume"};
-        int lineH = fm.getHeight() + 4;
-        int totalH = lines.length * lineH;
-        int startY = (GamePanel.MAP_HEIGHT - totalH) / 2;
+        int lineH  = fm.getHeight() + 4;
+        int startY = (GamePanel.MAP_HEIGHT - lines.length * lineH) / 2;
 
         for (int i = 0; i < lines.length; i++) {
             int lx = X + (W - fm.stringWidth(lines[i])) / 2;
@@ -288,16 +226,12 @@ public class HUD {
         }
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    //  Utilities
-    // ─────────────────────────────────────────────────────────────────────────
+    // ── Utilities ─────────────────────────────────────────────────────────────
 
-    /** Format score with leading zeros to 6 digits, e.g. 002500. */
     private String formatScore(int score) {
         return String.format("%06d", Math.max(0, score));
     }
 
-    /** Return the all-time high score, caching on first call. */
     private int getHighScore(int currentScore) {
         if (cachedHighScore < 0) {
             cachedHighScore = ScoreManager.loadTop(1)
@@ -306,7 +240,9 @@ public class HUD {
                 .max()
                 .orElse(0);
         }
-        return Math.max(cachedHighScore, currentScore);
+        // Update cache in real-time if current score beats it
+        if (currentScore > cachedHighScore) cachedHighScore = currentScore;
+        return cachedHighScore;
     }
 
     private void enableAA(Graphics2D g) {

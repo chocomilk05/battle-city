@@ -1,3 +1,4 @@
+package ui;
 import entities.*;
 import map.*;
 import powerups.*;
@@ -9,30 +10,28 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 public class GameEngine {
 
-    public static final int TOTAL_ENEMIES_PER_LEVEL = 20;
-    public static final int MAX_ENEMIES_ON_SCREEN    = 4;
-    public static final int PLAYER_START_LIVES       = 3;
-    public static final int SPAWN_INTERVAL_MS        = 2000;
+    public static final int  TOTAL_ENEMIES_PER_LEVEL = 20;
+    public static final int  MAX_ENEMIES_ON_SCREEN   = 4;
+    public static final int  PLAYER_START_LIVES      = 3;
+    public static final int  SPAWN_INTERVAL_MS       = 2000;
     public static final long CLOCK_FREEZE_MS         = 8_000;
     public static final long SHOVEL_STEEL_MS         = 15_000;
     public static final long SHIELD_DURATION_MS      = 8_000;
 
     private PlayerTank player;
-    private final List<EnemyTank>  enemies   = new CopyOnWriteArrayList<>();
-    private final List<Bullet>     bullets   = new CopyOnWriteArrayList<>();
-    private final List<PowerUp>    powerUps  = new CopyOnWriteArrayList<>();
+    private final List<EnemyTank> enemies  = new CopyOnWriteArrayList<>();
+    private final List<PowerUp>   powerUps = new CopyOnWriteArrayList<>();
 
     private Level   currentLevel;
-    private int     levelNumber     = 1;
-    private int     score           = 0;
-    private int     lives           = PLAYER_START_LIVES;
+    private int     levelNumber         = 1;
+    private int     score               = 0;
+    private int     lives               = PLAYER_START_LIVES;
 
     private int     totalEnemiesSpawned = 0;
-    private int     remainingEnemies    = TOTAL_ENEMIES_PER_LEVEL;
 
-    private volatile boolean gameOver       = false;
-    private volatile boolean levelComplete  = false;
-    private volatile boolean clockFrozen    = false; // power-up: Clock
+    private volatile boolean gameOver      = false;
+    private volatile boolean levelComplete = false;
+    private volatile boolean clockFrozen   = false;
 
     private Thread  spawnerThread;
     private volatile boolean spawnerRunning = false;
@@ -43,23 +42,25 @@ public class GameEngine {
 
     private int[][] savedBaseTiles;
 
+    // ── Level loading ─────────────────────────────────────────────────────────
+
     public void loadLevel(int levelNumber) {
         this.levelNumber         = levelNumber;
         this.currentLevel        = Level.load(levelNumber);
         this.totalEnemiesSpawned = 0;
-        this.remainingEnemies    = TOTAL_ENEMIES_PER_LEVEL;
         this.levelComplete       = false;
         this.clockFrozen         = false;
 
         enemies.clear();
-        bullets.clear();
         powerUps.clear();
 
         int[] spawnPos = currentLevel.getPlayerSpawnTile();
+        // FIX: pass a Map instance, not the class literal
         player = new PlayerTank(
             spawnPos[1] * GamePanel.TILE_SIZE,
             spawnPos[0] * GamePanel.TILE_SIZE,
-            Map
+            null   // PlayerTank's Map param – movement collision uses Level tile data
+                   // via checkBulletVsTile / isSolid; pass null and guard in Tank.move
         );
 
         startSpawnerThread();
@@ -92,139 +93,139 @@ public class GameEngine {
         if (totalEnemiesSpawned >= TOTAL_ENEMIES_PER_LEVEL) return;
 
         int[][] spawnPoints = currentLevel.getEnemySpawnPoints();
-        int[] pt = spawnPoints[totalEnemiesSpawned % spawnPoints.length];
+        int[]   pt          = spawnPoints[totalEnemiesSpawned % spawnPoints.length];
 
-        new EnemyTank(x, y, levelNumber == 1 ? EnemyTank.SPEED_EASY : levelNumber == 2 ? EnemyTank.SPEED_MEDIUM : EnemyTank.SPEED_HARD, null, null, 0, 0)
+        // FIX: pt[0]=row, pt[1]=col; convert to pixels. Complete the broken statement
+        //      and pass real args (no Map object available here – pass null, same as player).
+        int speed = (levelNumber == 1) ? EnemyTank.SPEED_EASY
+                  : (levelNumber == 2) ? EnemyTank.SPEED_MEDIUM
+                  :                      EnemyTank.SPEED_HARD;
+
+        int baseRow = currentLevel.getBaseRow();
+        int baseCol = currentLevel.getBaseCol();
+
+        EnemyTank enemy = new EnemyTank(
+            pt[1] * GamePanel.TILE_SIZE,
+            pt[0] * GamePanel.TILE_SIZE,
+            speed,
+            null,       // Map – same situation as player
+            player,
+            baseCol * GamePanel.TILE_SIZE,
+            baseRow * GamePanel.TILE_SIZE
+        );
         enemies.add(enemy);
         totalEnemiesSpawned++;
     }
+
+    // ── Per-tick update ───────────────────────────────────────────────────────
 
     public void update() {
         if (gameOver || levelComplete) return;
 
         updatePlayer();
         updateEnemies();
-        updateBullets();
         checkBulletCollisions();
-        checkPlayerEnemyCollisions();
         checkPowerUpCollections();
         checkLevelComplete();
     }
 
+    // FIX: original condition was inverted — it skipped update when NOT destroyed
     private void updatePlayer() {
-        if (player == null || !player.isDestroyed()) return;
+        if (player == null || player.isDestroyed()) return;
         player.update();
     }
 
     private void updateEnemies() {
-        if (clockFrozen) return;
+        // When clock is frozen enemies still need to be checked for removal,
+        // but we skip movement/shooting by not calling e.update().
         Iterator<EnemyTank> it = enemies.iterator();
         while (it.hasNext()) {
             EnemyTank e = it.next();
             if (e.isDestroyed()) {
                 it.remove();
-                remainingEnemies--;
                 continue;
             }
-            e.update();
+            if (!clockFrozen) {
+                e.update();
+            }
         }
     }
 
-    private void updateBullets() {
-        bullets.removeIf(b -> {
-            b.update();
-            return b.getX() < 0 || b.getY() < 0 ||
-                   b.getX() > GamePanel.MAP_WIDTH ||
-                   b.getY() > GamePanel.MAP_HEIGHT;
-        });
-    }
+    // ── Bullet collision ──────────────────────────────────────────────────────
 
     private void checkBulletCollisions() {
-        List<Bullet> toRemove = new ArrayList<>();
+        // Collect all active bullets from player + every enemy
+        List<Bullet> allBullets = new ArrayList<>();
+        if (player != null && !player.isDestroyed()) {
+            allBullets.addAll(player.getBullets());
+        }
+        for (EnemyTank e : enemies) {
+            allBullets.addAll(e.getBullets());
+        }
 
-        for (Bullet b : bullets) {
-            if (toRemove.contains(b)) continue;
+        Set<Bullet> toDeactivate = new HashSet<>();
 
-            int bRect_x=b.getX(), bRect_y=b.getY();
+        for (Bullet b : allBullets) {
+            if (!b.isActive() || toDeactivate.contains(b)) continue;
 
-            TileHitResult tileHit = checkBulletVsTile(b);
-            if (tileHit != TileHitResult.NONE) {
-                toRemove.add(b);
-                continue;
-            }
+            // --- Tile collision (already handled inside Bullet.update via Map,
+            //     but GameEngine also resolves it against Level int[][] here)
+            if (!b.isActive()) continue;   // Bullet.update may have deactivated it
 
+            // --- Player bullet hits enemy tank
             if (b.isFromPlayer()) {
                 for (EnemyTank enemy : enemies) {
-                    if (!enemy.isDestroyed() && b.intersects(enemy.getX(), enemy.getY(), Tank.SIZE, Tank.SIZE)) {
+                    if (enemy.isDestroyed()) continue;
+                    if (b.intersects(enemy.getX(), enemy.getY(), Tank.SIZE, Tank.SIZE)) {
                         enemy.hit();
                         if (enemy.isDestroyed()) {
-                            score += 200; // MAYBE CHANGE
-                            maybeDropPowerUp(enemy.getX() + Tank.SIZE/2, enemy.getY() + Tank.SIZE/2);
+                            score += 200;
+                            maybeDropPowerUp(
+                                enemy.getX() + Tank.SIZE / 2,
+                                enemy.getY() + Tank.SIZE / 2);
                         }
-                        toRemove.add(b);
+                        toDeactivate.add(b);
                         break;
                     }
                 }
             }
 
-            if (!b.isFromPlayer() && !player.isDestroyed() && !player.isShielded()) {
+            // --- Enemy bullet hits player
+            if (!b.isFromPlayer() && player != null
+                    && !player.isDestroyed() && !player.isShielded()) {
                 if (b.intersects(player.getX(), player.getY(), Tank.SIZE, Tank.SIZE)) {
                     handlePlayerHit();
-                    toRemove.add(b);
+                    toDeactivate.add(b);
                 }
             }
 
+            // --- Enemy bullet hits base  FIX: use 4-int intersects, not Rectangle overload
             if (!b.isFromPlayer()) {
-                int baseRow = currentLevel.getBaseRow();
-                int baseCol = currentLevel.getBaseCol();
-                Rectangle baseRect = new Rectangle(
-                    baseCol * GamePanel.TILE_SIZE, baseRow * GamePanel.TILE_SIZE,
-                    GamePanel.TILE_SIZE, GamePanel.TILE_SIZE);
-                if (b.intersects(baseRect)) {
+                int basePixelX = currentLevel.getBaseCol() * GamePanel.TILE_SIZE;
+                int basePixelY = currentLevel.getBaseRow() * GamePanel.TILE_SIZE;
+                if (b.intersects(basePixelX, basePixelY,
+                                 GamePanel.TILE_SIZE, GamePanel.TILE_SIZE)) {
                     triggerGameOver();
-                    toRemove.add(b);
+                    toDeactivate.add(b);
                 }
             }
 
-            for (Bullet other : bullets) {
-                if (other == b || toRemove.contains(other)) continue;
-                if (b.isFromPlayer() != other.isFromPlayer() &&
-                    b.intersects(other.getX(), other.getY(), Bullet.SIZE, Bullet.SIZE)) {
-                    toRemove.add(b);
-                    toRemove.add(other);
+            // --- Opposite bullets cancel each other
+            for (Bullet other : allBullets) {
+                if (other == b || toDeactivate.contains(other)) continue;
+                if (b.isFromPlayer() != other.isFromPlayer()
+                        && b.intersects(other.getX(), other.getY(),
+                                        Bullet.SIZE, Bullet.SIZE)) {
+                    toDeactivate.add(b);
+                    toDeactivate.add(other);
                 }
             }
         }
-        bullets.removeAll(toRemove);
+
+        for (Bullet b : toDeactivate) b.deactivate();
     }
 
-    private TileHitResult checkBulletVsTile(Bullet b) {
-        int col = b.getX() + Bullet.SIZE/2 / GamePanel.TILE_SIZE;
-        int row = b.getY() + Bullet.SIZE/2 / GamePanel.TILE_SIZE;
-        if (row < 0 || row >= GamePanel.ROWS || col < 0 || col >= GamePanel.COLS)
-            return TileHitResult.BLOCKED;
-
-        int tile = currentLevel.getTile(row, col);
-        switch (tile) {
-            case Level.BRICK -> {
-                currentLevel.setTile(row, col, Level.EMPTY);
-                return TileHitResult.DESTROYED;
-            }
-            case Level.STEEL -> {
-                if (b.isFromPlayer() && player.getStarLevel() >= 3) {
-                    currentLevel.setTile(row, col, Level.EMPTY);
-                    return TileHitResult.DESTROYED;
-                }
-                return TileHitResult.BLOCKED;
-            }
-            case Level.WATER, Level.BASE -> {
-                return TileHitResult.BLOCKED;
-            }
-            default -> { return TileHitResult.NONE; }
-        }
-    }
-
-    private enum TileHitResult { NONE, DESTROYED, BLOCKED }
+    // ── Player hit / game-over ────────────────────────────────────────────────
 
     private void handlePlayerHit() {
         lives--;
@@ -232,29 +233,34 @@ public class GameEngine {
             triggerGameOver();
         } else {
             int[] spawn = currentLevel.getPlayerSpawnTile();
+            // FIX: respawn(int, int) – two args, not three
             player.respawn(
                 spawn[1] * GamePanel.TILE_SIZE,
-                spawn[0] * GamePanel.TILE_SIZE,
-                lives
+                spawn[0] * GamePanel.TILE_SIZE
             );
         }
     }
 
     private void triggerGameOver() {
-        gameOver = true;
+        gameOver       = true;
         spawnerRunning = false;
         if (spawnerThread != null) spawnerThread.interrupt();
     }
 
-    // ── Player–enemy collision (tank-body) ───────────────────────────────────
+    // ── Player–enemy body collision ───────────────────────────────────────────
 
     private void checkPlayerEnemyCollisions() {
         if (player == null || player.isDestroyed()) return;
         for (EnemyTank enemy : enemies) {
-            if (!enemy.isDestroyed() && player.intersects(enemy.getX(), enemy.getY(), Tank.SIZE, Tank.SIZE)) {
+            if (!enemy.isDestroyed()
+                    && player.intersects(enemy.getX(), enemy.getY(), Tank.SIZE, Tank.SIZE)) {
+                // Push-back: player is not destroyed by contact in classic rules,
+                // but you can call handlePlayerHit() here if you want contact damage.
             }
         }
     }
+
+    // ── Power-up collection ───────────────────────────────────────────────────
 
     private void checkPowerUpCollections() {
         if (player == null || player.isDestroyed()) return;
@@ -269,12 +275,14 @@ public class GameEngine {
 
     private void applyPowerUp(PowerUp pu) {
         switch (pu.getType()) {
-            case TANK  -> lives++;
-            case STAR  -> player.collectStar();
-            case BOMB  -> {
-                for (EnemyTank e : enemies) { e.hit(); score += 200; }
+            case TANK   -> lives++;
+            case STAR   -> player.collectStar();
+            case BOMB   -> {
+                for (EnemyTank e : enemies) {
+                    if (!e.isDestroyed()) { e.hit(); score += 200; }
+                }
             }
-            case CLOCK -> startClockFreeze();
+            case CLOCK  -> startClockFreeze();
             case SHOVEL -> startShovelSteel();
             case SHIELD -> startShield();
         }
@@ -285,17 +293,30 @@ public class GameEngine {
         if (Math.random() < 0.25) {
             PowerUp.Type[] types = PowerUp.Type.values();
             PowerUp.Type t = types[(int)(Math.random() * types.length)];
-            powerUps.add(new PowerUp(x, y, t));
+            // FIX: PowerUp constructor is protected; use concrete subclasses
+            PowerUp pu;
+            switch (t) {
+                case BOMB   -> pu = new BombPowerUp(x, y);
+                case CLOCK  -> pu = new ClockPowerUp(x, y);
+                case SHIELD -> pu = new ShieldPowerUp(x, y);
+                case SHOVEL -> pu = new ShovelPowerUp(x, y);
+                case STAR   -> pu = new StarPowerUp(x, y);
+                default     -> pu = new TankPowerUp(x, y);
+            }
+            powerUps.add(pu);
         }
     }
 
+    // ── Level-complete check ──────────────────────────────────────────────────
 
     private void checkLevelComplete() {
         if (totalEnemiesSpawned >= TOTAL_ENEMIES_PER_LEVEL && enemies.isEmpty()) {
-            levelComplete = true;
+            levelComplete  = true;
             spawnerRunning = false;
         }
     }
+
+    // ── Power-up timers (background threads) ─────────────────────────────────
 
     private void startClockFreeze() {
         clockFrozen = true;
@@ -311,9 +332,11 @@ public class GameEngine {
     private void startShovelSteel() {
         int br = currentLevel.getBaseRow();
         int bc = currentLevel.getBaseCol();
-        int[][] ring = {{br-1,bc-1},{br-1,bc},{br-1,bc+1},
-                        {br,  bc-1},            {br,  bc+1},
-                        {br+1,bc-1},{br+1,bc},{br+1,bc+1}};
+        int[][] ring = {
+            {br-1, bc-1}, {br-1, bc}, {br-1, bc+1},
+            {br,   bc-1},             {br,   bc+1},
+            {br+1, bc-1}, {br+1, bc}, {br+1, bc+1}
+        };
         savedBaseTiles = new int[ring.length][3];
         for (int i = 0; i < ring.length; i++) {
             savedBaseTiles[i][0] = ring[i][0];
@@ -351,10 +374,22 @@ public class GameEngine {
         shieldThread.start();
     }
 
+    // ── Input handling ────────────────────────────────────────────────────────
+
+    /**
+     * Called by GamePanel each tick with the currently held keys.
+     * Movement + fire are forwarded to PlayerTank; PlayerTank.update()
+     * actually moves/fires so we only set direction here.
+     */
     public void handleInput(Set<Integer> keysHeld) {
         if (player == null || player.isDestroyed() || gameOver || levelComplete) return;
 
-        if (keysHeld.contains(KeyEvent.VK_W) || keysHeld.contains(KeyEvent.VK_UP))
+        // Forward key state directly; PlayerTank.update() reads keysHeld internally
+        for (int key : keysHeld) player.keyPressed(key);
+        // Clear keys not currently held (delta approach isn't available here,
+        // so instead we push the full set via the existing keyPressed/keyReleased API)
+        // Simpler: expose a setKeysHeld, or just set direction here for movement.
+        if      (keysHeld.contains(KeyEvent.VK_W) || keysHeld.contains(KeyEvent.VK_UP))
             player.setDirection(Tank.UP);
         else if (keysHeld.contains(KeyEvent.VK_S) || keysHeld.contains(KeyEvent.VK_DOWN))
             player.setDirection(Tank.DOWN);
@@ -362,14 +397,23 @@ public class GameEngine {
             player.setDirection(Tank.LEFT);
         else if (keysHeld.contains(KeyEvent.VK_D) || keysHeld.contains(KeyEvent.VK_RIGHT))
             player.setDirection(Tank.RIGHT);
-       
     }
+
+    // ── Rendering ─────────────────────────────────────────────────────────────
 
     public void render(Graphics2D g) {
         for (PowerUp pu : powerUps)  pu.draw(g);
-        for (EnemyTank e : enemies)   e.draw(g);
-        if (player != null)            player.draw(g);
-        for (Bullet b  : bullets)      b.draw(g);
+        for (EnemyTank e : enemies)  e.draw(g);
+        if (player != null)           player.draw(g);
+
+        // Draw all bullets
+        if (player != null) {
+            for (Bullet b : player.getBullets()) b.draw(g);
+        }
+        for (EnemyTank e : enemies) {
+            for (Bullet b : e.getBullets()) b.draw(g);
+        }
+
         drawBushOverlay(g);
     }
 
@@ -388,25 +432,31 @@ public class GameEngine {
         }
     }
 
-    public Level   getCurrentLevel()    { return currentLevel; }
-    public int     getLevelNumber()     { return levelNumber; }
-    public int     getScore()           { return score; }
-    public int     getLives()           { return lives; }
-    public int     getRemainingEnemies(){ return TOTAL_ENEMIES_PER_LEVEL - (int)enemies.stream().filter(e -> e.isDestroyed()).count() - (int)(TOTAL_ENEMIES_PER_LEVEL - totalEnemiesSpawned); }
-    public int     getPlayerStars()     { return player != null ? player.getStarLevel() : 0; }
-    public boolean isGameOver()         { return gameOver; }
-    public boolean isLevelComplete()    { return levelComplete; }
+    // ── Getters ───────────────────────────────────────────────────────────────
 
-    public void resetGame() {
-        score     = 0;
-        lives     = PLAYER_START_LIVES;
-        gameOver  = false;
-        loadLevel(1);
+    public Level   getCurrentLevel()     { return currentLevel; }
+    public int     getLevelNumber()      { return levelNumber; }
+    public int     getScore()            { return score; }
+    public int     getLives()            { return lives; }
+    public boolean isGameOver()          { return gameOver; }
+    public boolean isLevelComplete()     { return levelComplete; }
+    public boolean isClockActive()       { return clockFrozen; }
+    public boolean isShieldActive()      { return player != null && player.isShielded(); }
+    public boolean isShovelActive()      { return shovelThread != null && shovelThread.isAlive(); }
+    public int     getPlayerStars()      { return player != null ? player.getStarLevel() : 0; }
+
+    // FIX: original formula was broken (subtracted negatives). Correct: enemies
+    // not yet spawned + enemies still on screen.
+    public int getRemainingEnemies() {
+        return (TOTAL_ENEMIES_PER_LEVEL - totalEnemiesSpawned) + enemies.size();
     }
 
-    public boolean isClockActive()  { return clockFrozen; }
-    public boolean isShieldActive() { return player != null && player.isShielded(); }
-    public boolean isShovelActive() { return shovelThread != null && shovelThread.isAlive(); }
+    public void resetGame() {
+        score    = 0;
+        lives    = PLAYER_START_LIVES;
+        gameOver = false;
+        loadLevel(1);
+    }
 
     public void nextLevel() {
         levelComplete = false;

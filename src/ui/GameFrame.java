@@ -1,3 +1,4 @@
+package ui;
 import data.ScoreManager;
 import data.ScoreEntry;
 import map.MapEditor;
@@ -18,19 +19,19 @@ public class GameFrame extends JFrame implements PropertyChangeListener {
     public static final String CARD_EDITOR = "EDITOR";
 
     // ── Layout ────────────────────────────────────────────────────────────────
-    private final CardLayout   cardLayout  = new CardLayout();
-    private final JPanel       cardPanel   = new JPanel(cardLayout);
+    private final CardLayout cardLayout = new CardLayout();
+    private final JPanel     cardPanel  = new JPanel(cardLayout);
 
-    // ── Core game objects (created fresh on each New Game) ────────────────────
-    private GameEngine  engine;
-    private GamePanel   gamePanel;
+    // ── Core game objects ─────────────────────────────────────────────────────
+    private GameEngine engine;
+    private GamePanel  gamePanel;
 
     // ── Persistent screens ────────────────────────────────────────────────────
-    private final MainMenu  mainMenu;
-    private       MapEditor mapEditor;  // created lazily
+    private final MainMenu mainMenu;
+    private       MapEditor mapEditor;   // created lazily
 
-    // ── Menu-bar controls ─────────────────────────────────────────────────────
-    private JMenuItem pauseItem;   // toggles Pause / Resume
+    // ── Menu-bar items ────────────────────────────────────────────────────────
+    private JMenuItem pauseItem;
     private JMenuItem newGameItem;
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -42,13 +43,15 @@ public class GameFrame extends JFrame implements PropertyChangeListener {
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setResizable(false);
 
-        // ── Main menu ─────────────────────────────────────────────────────────
         mainMenu = new MainMenu(this);
-        cardPanel.add(mainMenu, CARD_MENU);
 
-        // ── Placeholder game panel (real one created on New Game) ─────────────
-        cardPanel.add(new JPanel(), CARD_GAME);   // replaced on first new game
-        cardPanel.add(new JPanel(), CARD_EDITOR); // replaced on first editor open
+        // Name each placeholder so getCardComponent() can locate them later
+        JPanel gamePlaceholder   = new JPanel(); gamePlaceholder.setName(CARD_GAME);
+        JPanel editorPlaceholder = new JPanel(); editorPlaceholder.setName(CARD_EDITOR);
+
+        cardPanel.add(mainMenu,          CARD_MENU);
+        cardPanel.add(gamePlaceholder,   CARD_GAME);
+        cardPanel.add(editorPlaceholder, CARD_EDITOR);
 
         setContentPane(cardPanel);
         setJMenuBar(buildMenuBar());
@@ -58,16 +61,13 @@ public class GameFrame extends JFrame implements PropertyChangeListener {
         setLocationRelativeTo(null);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    //  Menu bar
-    // ─────────────────────────────────────────────────────────────────────────
+    // ── Menu bar ──────────────────────────────────────────────────────────────
 
     private JMenuBar buildMenuBar() {
         JMenuBar bar = new JMenuBar();
         bar.setBackground(new Color(30, 30, 30));
         bar.setBorderPainted(false);
 
-        // ── Game menu ─────────────────────────────────────────────────────────
         JMenu gameMenu = darkMenu("Game");
 
         newGameItem = darkItem("New Game", KeyEvent.VK_N, e -> startNewGame());
@@ -83,12 +83,10 @@ public class GameFrame extends JFrame implements PropertyChangeListener {
         gameMenu.add(darkItem("Exit", KeyEvent.VK_Q, e -> confirmExit()));
         bar.add(gameMenu);
 
-        // ── View menu ─────────────────────────────────────────────────────────
         JMenu viewMenu = darkMenu("View");
         viewMenu.add(darkItem("High Scores", KeyEvent.VK_H, e -> showHighScores()));
         bar.add(viewMenu);
 
-        // ── Help menu ─────────────────────────────────────────────────────────
         JMenu helpMenu = darkMenu("Help");
         helpMenu.add(darkItem("How to Play", KeyEvent.VK_F1, e -> showHelp()));
         helpMenu.addSeparator();
@@ -99,8 +97,6 @@ public class GameFrame extends JFrame implements PropertyChangeListener {
 
         return bar;
     }
-
-    // ── Factory helpers for dark-themed menu components ───────────────────────
 
     private JMenu darkMenu(String text) {
         JMenu m = new JMenu(text);
@@ -119,11 +115,8 @@ public class GameFrame extends JFrame implements PropertyChangeListener {
         return item;
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    //  Card navigation
-    // ─────────────────────────────────────────────────────────────────────────
+    // ── Card navigation ───────────────────────────────────────────────────────
 
-    /** Show the main menu and stop any running game. */
     public void showMenu() {
         if (gamePanel != null) gamePanel.stopGame();
         pauseItem.setVisible(false);
@@ -131,9 +124,7 @@ public class GameFrame extends JFrame implements PropertyChangeListener {
         pack();
     }
 
-    /** Create a fresh engine + panel, load level 1, and show the game card. */
     public void startNewGame() {
-        // Stop previous game if any
         if (gamePanel != null) {
             gamePanel.stopGame();
             gamePanel.removePropertyChangeListener(this);
@@ -141,12 +132,11 @@ public class GameFrame extends JFrame implements PropertyChangeListener {
 
         engine    = new GameEngine();
         gamePanel = new GamePanel(engine);
+        gamePanel.setName(CARD_GAME);
         gamePanel.addPropertyChangeListener(this);
 
-        // Replace the GAME card
-        cardPanel.remove(getCardComponent(CARD_GAME));
-        cardPanel.add(gamePanel, CARD_GAME);
-        cardPanel.revalidate();
+        // FIX: replace existing GAME card properly
+        replaceCard(CARD_GAME, gamePanel);
 
         engine.resetGame();   // loads level 1
         cardLayout.show(cardPanel, CARD_GAME);
@@ -156,25 +146,35 @@ public class GameFrame extends JFrame implements PropertyChangeListener {
         gamePanel.startGame();
     }
 
-    /** Open / re-open the map editor. */
     private void openMapEditor() {
         if (gamePanel != null) gamePanel.stopGame();
         pauseItem.setVisible(false);
 
         if (mapEditor == null) {
             mapEditor = new MapEditor();
+            mapEditor.setName(CARD_EDITOR);
+            // Listen for "Back to Menu" property fired by MapEditor
+            mapEditor.addPropertyChangeListener("screen", evt -> {
+                if ("MENU".equals(evt.getNewValue())) showMenu();
+            });
         }
-        cardPanel.remove(getCardComponent(CARD_EDITOR));
-        cardPanel.add(mapEditor, CARD_EDITOR);
-        cardPanel.revalidate();
-
+        replaceCard(CARD_EDITOR, mapEditor);
         cardLayout.show(cardPanel, CARD_EDITOR);
         pack();
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    //  In-game actions
-    // ─────────────────────────────────────────────────────────────────────────
+    /**
+     * Remove the existing component occupying a card slot and add the new one.
+     */
+    private void replaceCard(String cardName, JComponent newComp) {
+        Component old = getCardComponent(cardName);
+        if (old != null) cardPanel.remove(old);
+        newComp.setName(cardName);
+        cardPanel.add(newComp, cardName);
+        cardPanel.revalidate();
+    }
+
+    // ── In-game actions ───────────────────────────────────────────────────────
 
     private void togglePause() {
         if (gamePanel == null) return;
@@ -182,9 +182,7 @@ public class GameFrame extends JFrame implements PropertyChangeListener {
         pauseItem.setText(gamePanel.isPaused() ? "Resume" : "Pause");
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    //  PropertyChangeListener – receives GAME_OVER / LEVEL_COMPLETE
-    // ─────────────────────────────────────────────────────────────────────────
+    // ── PropertyChangeListener ────────────────────────────────────────────────
 
     @Override
     public void propertyChange(PropertyChangeEvent evt) {
@@ -198,11 +196,17 @@ public class GameFrame extends JFrame implements PropertyChangeListener {
 
     private void handleGameOver() {
         pauseItem.setVisible(false);
-        // Ask for player name and save score
-        String name = JOptionPane.showInputDialog(this,
-            "GAME OVER!\nYour score: " + engine.getScore() +
-            "\n\nEnter your name to save your score:",
-            "Game Over", JOptionPane.PLAIN_MESSAGE);
+
+        // FIX: pre-fill name from Options so the player doesn't have to retype it
+        String defaultName = ui.OptionsScreen.getPlayerName();
+        String name = (String) JOptionPane.showInputDialog(
+            this,
+            "GAME OVER!\nYour score: " + engine.getScore()
+                + "\n\nEnter your name to save your score:",
+            "Game Over",
+            JOptionPane.PLAIN_MESSAGE,
+            null, null, defaultName);
+
         if (name != null && !name.isBlank()) {
             ScoreManager.save(new ScoreEntry(
                 name.trim(),
@@ -217,31 +221,19 @@ public class GameFrame extends JFrame implements PropertyChangeListener {
     private void handleLevelComplete() {
         int next = engine.getLevelNumber() + 1;
         JOptionPane.showMessageDialog(this,
-            "Level " + engine.getLevelNumber() + " complete!\nGet ready for level " + next + "…",
+            "Level " + engine.getLevelNumber() + " complete!\n"
+                + "Get ready for level " + next + "…",
             "Level Complete", JOptionPane.INFORMATION_MESSAGE);
         engine.nextLevel();
         gamePanel.startGame();
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    //  Dialog launchers
-    // ─────────────────────────────────────────────────────────────────────────
+    // ── Dialog launchers ──────────────────────────────────────────────────────
 
-    private void showHighScores() {
-        new HighScoreScreen(this).setVisible(true);
-    }
-
-    private void showHelp() {
-        new HelpScreen(this).setVisible(true);
-    }
-
-    private void showOptions() {
-        new OptionsScreen(this).setVisible(true);
-    }
-
-    private void showAbout() {
-        new AboutDialog(this).setVisible(true);
-    }
+    private void showHighScores() { new HighScoreScreen(this).setVisible(true); }
+    private void showHelp()       { new HelpScreen(this).setVisible(true); }
+    private void showOptions()    { new OptionsScreen(this).setVisible(true); }
+    private void showAbout()      { new AboutDialog(this).setVisible(true); }
 
     private void confirmExit() {
         int choice = JOptionPane.showConfirmDialog(this,
@@ -250,26 +242,19 @@ public class GameFrame extends JFrame implements PropertyChangeListener {
         if (choice == JOptionPane.YES_OPTION) System.exit(0);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    //  Utility
-    // ─────────────────────────────────────────────────────────────────────────
+    // ── Utility ───────────────────────────────────────────────────────────────
 
     /**
-     * Find the component currently occupying a named card slot.
-     * We walk the cardPanel's children to find the one with the matching name.
+     * Find the component occupying a named card slot by matching setName().
      */
     private Component getCardComponent(String name) {
         for (Component c : cardPanel.getComponents()) {
             if (name.equals(c.getName())) return c;
         }
-        // CardLayout doesn't store names on components by default,
-        // so we add them via setName when we build each card component.
-        return new JPanel(); // safe fallback
+        return null;
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    //  Entry point
-    // ─────────────────────────────────────────────────────────────────────────
+    // ── Entry point ───────────────────────────────────────────────────────────
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {

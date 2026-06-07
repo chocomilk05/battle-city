@@ -16,19 +16,12 @@ import java.util.List;
  */
 public class HighScoreScreen extends JDialog {
 
-    // ── Colours ───────────────────────────────────────────────────────────────
     private static final Color BG        = new Color(10, 10, 10);
     private static final Color HEADER_BG = new Color(120, 20, 0);
     private static final Color ROW_ODD   = new Color(25, 25, 25);
     private static final Color ROW_EVEN  = new Color(40, 10, 0);
     private static final Color FG        = Color.ORANGE;
     private static final Color GOLD      = new Color(255, 215, 0);
-    private static final Color SILVER    = new Color(192, 192, 192);
-    private static final Color BRONZE    = new Color(205, 127, 50);
-
-    // ─────────────────────────────────────────────────────────────────────────
-    //  Constructor
-    // ─────────────────────────────────────────────────────────────────────────
 
     public HighScoreScreen(Frame owner) {
         super(owner, "★  High Scores", true);
@@ -36,16 +29,16 @@ public class HighScoreScreen extends JDialog {
         getContentPane().setBackground(BG);
         setLayout(new BorderLayout(0, 0));
 
-        add(buildTitleBar(),   BorderLayout.NORTH);
-        add(buildTable(),      BorderLayout.CENTER);
-        add(buildCloseBar(),   BorderLayout.SOUTH);
+        add(buildTitleBar(), BorderLayout.NORTH);
+        add(buildTable(),    BorderLayout.CENTER);
+        add(buildCloseBar(), BorderLayout.SOUTH);
 
         setSize(560, 440);
         setLocationRelativeTo(owner);
         setResizable(false);
     }
 
-    // ── Title banner ──────────────────────────────────────────────────────────
+    // ── Title ─────────────────────────────────────────────────────────────────
 
     private JPanel buildTitleBar() {
         JPanel p = new JPanel();
@@ -58,14 +51,16 @@ public class HighScoreScreen extends JDialog {
         return p;
     }
 
-    // ── Score table ───────────────────────────────────────────────────────────
+    // ── Table ─────────────────────────────────────────────────────────────────
 
     private JScrollPane buildTable() {
         String[] columns = {"#", "Name", "Score", "Date", "Time"};
         List<ScoreEntry> entries = ScoreManager.loadTop(10);
 
-        Object[][] data = new Object[Math.max(entries.size(), 10)][5];
-        for (int i = 0; i < data.length; i++) {
+        // FIX: always show exactly 10 rows (pad with dashes if fewer entries)
+        int ROWS = 10;
+        Object[][] data = new Object[ROWS][5];
+        for (int i = 0; i < ROWS; i++) {
             if (i < entries.size()) {
                 ScoreEntry e = entries.get(i);
                 data[i][0] = i + 1;
@@ -87,14 +82,14 @@ public class HighScoreScreen extends JDialog {
         };
 
         JTable table = new JTable(model) {
-            @Override public Component prepareRenderer(TableCellRenderer r, int row, int col) {
+            @Override
+            public Component prepareRenderer(TableCellRenderer r, int row, int col) {
                 Component c = super.prepareRenderer(r, row, col);
-                // Medal colours for top 3
-                Color rowBg = (row % 2 == 0) ? ROW_ODD : ROW_EVEN;
-                if (row == 0)      c.setBackground(new Color(60, 50, 0));
+                // Medal tints for top 3
+                if      (row == 0) c.setBackground(new Color(60, 50, 0));
                 else if (row == 1) c.setBackground(new Color(40, 40, 40));
                 else if (row == 2) c.setBackground(new Color(40, 20, 0));
-                else               c.setBackground(rowBg);
+                else               c.setBackground(row % 2 == 0 ? ROW_ODD : ROW_EVEN);
                 c.setForeground(col == 2 ? GOLD : FG);
                 return c;
             }
@@ -110,19 +105,16 @@ public class HighScoreScreen extends JDialog {
         table.setShowVerticalLines(false);
         table.setIntercellSpacing(new Dimension(0, 1));
 
-        // Header styling
         JTableHeader header = table.getTableHeader();
         header.setBackground(HEADER_BG);
         header.setForeground(Color.WHITE);
         header.setFont(new Font("Monospaced", Font.BOLD, 13));
         header.setReorderingAllowed(false);
 
-        // Column widths
         int[] widths = {40, 180, 100, 110, 100};
         for (int i = 0; i < widths.length; i++) {
             table.getColumnModel().getColumn(i).setPreferredWidth(widths[i]);
-            table.getColumnModel().getColumn(i)
-                 .setCellRenderer(centeredRenderer());
+            table.getColumnModel().getColumn(i).setCellRenderer(centeredRenderer());
         }
 
         JScrollPane scroll = new JScrollPane(table);
@@ -138,7 +130,7 @@ public class HighScoreScreen extends JDialog {
         return r;
     }
 
-    // ── Close button row ──────────────────────────────────────────────────────
+    // ── Bottom buttons ────────────────────────────────────────────────────────
 
     private JPanel buildCloseBar() {
         JPanel p = new JPanel();
@@ -153,7 +145,9 @@ public class HighScoreScreen extends JDialog {
             if (choice == JOptionPane.YES_OPTION) {
                 ScoreManager.clearAll();
                 dispose();
-                new HighScoreScreen((Frame) getOwner()).setVisible(true);
+                // FIX: getOwner() returns Window; cast safely to Frame
+                Frame owner = (Frame) getOwner();
+                new HighScoreScreen(owner).setVisible(true);
             }
         });
         p.add(clearBtn);
@@ -161,6 +155,7 @@ public class HighScoreScreen extends JDialog {
         JButton closeBtn = styledButton("Close");
         closeBtn.addActionListener(e -> dispose());
         p.add(closeBtn);
+
         return p;
     }
 
